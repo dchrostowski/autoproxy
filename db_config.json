@@ -1,0 +1,6 @@
+{
+    "host": "localhost",
+    "user": "postgres",
+    "database": "proxies",
+    "password": "somepassword"
+}

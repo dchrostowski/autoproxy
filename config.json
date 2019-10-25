@@ -1,0 +1,70 @@
+{
+    "proxy_interval": {
+        "value": 7200,
+        "description": "Minimum number of seconds that must pass before using proxy again"
+    },
+
+    "blacklist_threshold": {
+        "value": 4,
+        "description": "Number of bad requests before proxy is put into blacklisted state"
+    },
+
+    "blacklist_time": {
+        "value": 86400,
+        "description": "Amount of time proxy must stay in blacklisted state"
+    },
+
+    "max_blacklist_count": {
+        "value": 10,
+        "description": "Max number of times a proxy can enter blacklist state before it is permanently blacklisted"
+    },
+
+    "decrement_blacklist": {
+        "value": true,
+        "description": "Decrement blacklist upon successful request."
+    },
+
+    "designated_endpoint": {
+        "value": "https://api.dev.proxycrawler.com/proxy/test",
+        "description": "A designated test endpoint which does not blacklist any requests."
+    },
+
+    "seed_queue": {
+        "value": 1,
+        "description": "Reserved queue id which is used only for the designated endpoint"
+    },
+
+    "aggregate_queue": {
+        "value": 2,
+        "description": "Reserved queue id that aggregates all proxy detail records for all queues except the seed"
+    },
+
+    "seed_frequency": {
+        "value": 0.10,
+        "description": "Percent/probability for when to use a new seed proxy"
+    },
+
+    "retry_inactive_frequency": {
+        "value": 0.05,
+        "description": "Percent/probability for when to use an unblacklisted, inactive proxy (sum of this and seed_frequency should not exceed 1)"
+    },
+
+    "sync_interval": {
+        "value": 1800,
+        "description": "How many seconds between syncing cache with database"
+    },
+
+    "database_credential_file": {
+        "value": "db_config.json",
+        "description": "filename of database credentials json file, this should be added to .gitignore"
+    },
+
+    "overrides": {
+
+        "queues": {
+            "3": {}
+        },
+        "description": "Override any config settings above only for specific queues"
+    }
+
+}
