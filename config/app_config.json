@@ -56,7 +56,12 @@
 
     "database_credential_file": {
         "value": "db_config.json",
-        "description": "filename of database credentials json file, this should be added to .gitignore"
+        "description": "filename of json file containing postgres database credentials"
+    },
+
+    "redis_credential_file": {
+        "value": "redis_config.json",
+        "description": "filename of json file containing redis credentials"
     },
 
     "overrides": {
