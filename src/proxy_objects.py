@@ -1,6 +1,7 @@
 from IPython import embed
 from datetime import datetime
 import time
+from random import randint
 
 
 class Proxy(object):
@@ -59,7 +60,7 @@ class Detail(object):
     @load_time.setter
     def load_time(self,delta_t):
         print("load time setter")
-        self._load_time = delta_t.microseconds * 0.001
+        self._load_time = delta_t.microseconds
     
 
     @property
@@ -88,14 +89,14 @@ class ProxyObject(Proxy):
         if detail.queue_id != queue.queue_id:
             raise Exception("Detail/Queue mismatch on queue id")
 
-        self._proxy = proxy
-        self._queue = queue
-        self._detail = detail
+        self.proxy = proxy
+        self.queue = queue
+        self.detail = detail
 
         self.dispatch_time = None
-        self.load_time = self._detail._load_time
+        
 
-        super().__init__(self._proxy.address, self._proxy.port, self._proxy.protocol, self._proxy.id)
+        super().__init__(self.proxy.address, self.proxy.port, self.proxy.protocol, self.proxy.id)
 
   
     def dispatch(self):
@@ -104,7 +105,8 @@ class ProxyObject(Proxy):
     def callback(self,success):
         print("dispatched at %s" % self.dispatch_time)
         print("it is now %s" % datetime.now())
-        self._detail.load_time = datetime.now() - self.dispatch_time
+        self.detail.load_time = datetime.now() - self.dispatch_time
+        self.dispatch_time = None
         if(success):
             print("success")
         else:
@@ -119,8 +121,12 @@ p = Proxy('a', 32)
 d = Detail()
 q = Queue('streetscrape.com')
 proxy = ProxyObject(p,q,d)
-proxy.dispatch()
-time.sleep(2)
-proxy.callback(True)
+for i in range(5):
+    proxy.dispatch()
+    time.sleep(randint(1,4))
+    proxy.callback(True)
+    print("laod time: %s" % proxy.detail.load_time)
 
-embed()
+
+
+
