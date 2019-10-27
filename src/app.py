@@ -1,12 +1,14 @@
 import time
-
+import os
+import sys
 import redis
-from redis_manager import redis_manager
+from redis_manager import cache
 from flask import Flask
+from autoproxy_config.config import config_dict
+
+
 
 app = Flask(__name__)
-cache = redis_manager
-
 
 def get_hit_count():
     retries = 5
@@ -22,5 +24,6 @@ def get_hit_count():
 
 @app.route('/')
 def hello():
+    
     count = get_hit_count()
     return 'Hello World! I have been seen {} times.\n'.format(count)

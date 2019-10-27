@@ -28,4 +28,4 @@ class ConfigReader(dict):
             setattr(self,k,self[k])
         
 
-config = ConfigReader()
+config_dict = ConfigReader()
