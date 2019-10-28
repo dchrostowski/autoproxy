@@ -12,7 +12,7 @@ CREATE TABLE queues (
     CONSTRAINT domain_unique UNIQUE("domain")
 );
 
-CREATE TABLE proxy_details (
+CREATE TABLE details (
     "detail_id" SERIAL PRIMARY KEY,
     "proxy_id" INTEGER REFERENCES proxies("proxy_id"),
     "queue_id" INTEGER REFERENCES queues("queue_id"),

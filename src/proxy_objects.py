@@ -111,22 +111,6 @@ class ProxyObject(Proxy):
             print("success")
         else:
             print("failure")
-        
-
-
-    
-
-
-p = Proxy('a', 32)
-d = Detail()
-q = Queue('streetscrape.com')
-proxy = ProxyObject(p,q,d)
-for i in range(5):
-    proxy.dispatch()
-    time.sleep(randint(1,4))
-    proxy.callback(True)
-    print("laod time: %s" % proxy.detail.load_time)
-
 
 
 

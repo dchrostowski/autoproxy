@@ -2,9 +2,8 @@ import time
 import os
 import sys
 import redis
-from redis_manager import cache
+from storage_manager import cache
 from flask import Flask
-from autoproxy_config.config import config_dict
 
 
 
