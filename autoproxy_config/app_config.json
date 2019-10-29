@@ -44,7 +44,7 @@
         "description": "Percent/probability for when to use a new seed proxy"
     },
 
-    "retry_inactive_frequency": {
+    "inactive": {
         "value": 0.05,
         "description": "Percent/probability for when to use an unblacklisted, inactive proxy (sum of this and seed_frequency should not exceed 1)"
     },
@@ -54,9 +54,19 @@
         "description": "How many seconds between syncing cache with database"
     },
 
-    "proxies_per_queue": {
+    "active_proxies_per_queue": {
         "value": 1000,
-        "description": "The max number of proxies to be loaded into memory per sync interval order by last_used descending"
+        "description": "The max number of active proxies to be loaded into memory per sync interval order by last_used descending"
+    },
+
+    "inactive_proxies_per_queue": {
+        "value": 200,
+        "descripton": "The number of inactive proxies to be loaded into memory per sync interval"
+    },
+
+    "seed_proxies_per_queue": {
+        "value": 200,
+        "description": "The number of new proxies to try out"
     },
 
     "overrides": {

@@ -13,6 +13,14 @@ from proxy_objects import Proxy, Detail, Queue
 
 from autoproxy_config.config import configuration
 
+
+SEED_QUEUE_ID = configuration.app_config['seed_queue']['value']
+AGGREGATE_QUEUE_ID = configuration.app_config['aggregate_queue']['value']
+LIMIT_ACTIVE = configuration.app_config['active_proxies_per_queue']['value']
+LIMIT_INACTIVE = configuration.app_config['inactive_proxies_per_queue']['value']
+LIMIT_SEED = configuration.app_config['seed_proxies_per_queue']['value']
+
+
 class PostgresManager(object):
     def __init__(self):
         self.connect_params = configuration.db_config
@@ -26,6 +34,16 @@ class PostgresManager(object):
     def cursor(self):
         return self.new_connection().cursor()
 
+    def do_query(self, query, params=None):
+        cursor = self.cursor()
+        cursor.execute(query,params)
+        data = cursor.fetchall()
+        cursor.close()
+        return data
+
+
+
+
 
 class Redis(redis.Redis):
     def __init__(self,*args,**kwargs):
@@ -35,7 +53,7 @@ class RedisManager(object):
     def __init__(self):
         logging.info("redis manager init")
         self.redis = Redis(**configuration.redis_config)
-        self.postgres_manager = PostgresManager()
+        self.dbh = PostgresManager()
 
             
         while self.redis.get('init') is None:
@@ -52,16 +70,12 @@ class RedisManager(object):
     def get_queues_from_db(self):
         logging.info("fetching queues")
         data = {}
-        cursor = self.postgres_manager.cursor()
-        cursor.execute("select * from queues")
-        queues = {r.queue_id: Queue(**r) for r in cursor.fetchall()}
-        cursor.close()
+        
+        query = "SELECT * FROM queues;"
+        queues = {r['queue_id']: Queue(**r) for r in self.dbh.do_query(query)}
 
-        sqid = configuration.app_config['seed_queue']['value']
-        aqid = configuration.app_config['aggregate_queue']['value']
-
-        queues[sqid] = Queue(queue_id=sqid, domain="SEED_QUEUE")    
-        queues[aqid] = Queue(queue_id=aqid, domain="AGGREGATE_QUEUE")
+        queues[SEED_QUEUE_ID] = Queue(queue_id=SEED_QUEUE_ID, domain="SEED_QUEUE")    
+        queues[AGGREGATE_QUEUE_ID] = Queue(queue_id=AGGREGATE_QUEUE_ID, domain="AGGREGATE_QUEUE")
 
         for queue_object in queues.values():
             self.register_queue(queue_object)
@@ -69,10 +83,48 @@ class RedisManager(object):
 
     def get_queues_from_cache(self):
         return self.redis.keys('q_*')
+    
+
+    def get_seed_queue(self):
+        pass
+
+    def get_seed_count(self):
+        query = "SELECT COUNT(*) as detail_count FROM details where queue_id=%(queue_id)s;"
+        params = {'queue_id': SEED_QUEUE_ID}
+        return self.dbh.do_query(query,params)[0]['detail_count']
+        
+
+
+    def init_seeds(self):
+        return []
+        
+
+
 
 
     def get_proxies_from_db(self):
-        logging.info("fetching proxies")
+        seeds = []
+        seed_count = self.get_seed_count()
+        if(seed_count == 0):
+            seeds = self.init_seeds()
+
+
+        else:
+            seed_proxies_query = """
+                SELECT * FROM details
+                WHERE queue_id = %(seed_queue_id)s
+                AND active = %(active)s
+                ORDER BY last_used ASC
+                LIMIT %(limit)s;
+            """
+            paramms1 = {"seed_queue_id": SEED_QUEUE_ID, "active": True, "limit":LIMIT_ACTIVE}
+            params2 = {"seed_queue_id": SEED_QUEUE_ID, "active": False, "limit":LIMIT_INACTIVE}
+            res1 = self.dbh.do_query(seed_proxies_query, seed_query_params1)
+            res2 = self.dbh.do_query(seed_proxies_query, seed_query_params2)
+            seeds = [Detail(**r) for r in res1+res2]
+
+
+        
 
 
 
@@ -86,25 +138,7 @@ class RedisManager(object):
         self.redis.set('temp_detail_id',0)
 
         self.get_queues_from_db()
-        self.get_details_from_db()
-
-        """    
-        proxies = { p['proxy_id']: Proxy(**p) for p in data['proxies'] }
-        queues= { q['queue_id']: Queue(**q) for q in data['queues'] }
-        details = { d['detail_id']: Detail(**q) for d in data['details'] }
-        """
-        proxies = data['proxies']
-        queues = data['queues']
-        #details = data['details']
-
-        
-
-
-
-
-        
-        #self.save_to_cache(proxy_object_instances, next_ids)
-    
+        self.get_proxies_from_db()
 
     def register_proxy(self, proxy):
         logging.info('register proxy')
