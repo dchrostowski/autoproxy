@@ -54,14 +54,9 @@
         "description": "How many seconds between syncing cache with database"
     },
 
-    "database_credential_file": {
-        "value": "db_config.json",
-        "description": "filename of json file containing postgres database credentials"
-    },
-
-    "redis_credential_file": {
-        "value": "redis_config.json",
-        "description": "filename of json file containing redis credentials"
+    "proxies_per_queue": {
+        "value": 1000,
+        "description": "The max number of proxies to be loaded into memory per sync interval order by last_used descending"
     },
 
     "overrides": {

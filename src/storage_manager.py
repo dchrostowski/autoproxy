@@ -49,6 +49,35 @@ class RedisManager(object):
                     except Exception:
                         pass
 
+    def get_queues_from_db(self):
+        logging.info("fetching queues")
+        data = {}
+        cursor = self.postgres_manager.cursor()
+        cursor.execute("select * from queues")
+        queues = {r.queue_id: Queue(**r) for r in cursor.fetchall()}
+        cursor.close()
+
+        sqid = configuration.app_config['seed_queue']['value']
+        aqid = configuration.app_config['aggregate_queue']['value']
+
+        queues[sqid] = Queue(queue_id=sqid, domain="SEED_QUEUE")    
+        queues[aqid] = Queue(queue_id=aqid, domain="AGGREGATE_QUEUE")
+
+        for queue_object in queues.values():
+            self.register_queue(queue_object)
+        return queues
+
+    def get_queues_from_cache(self):
+        return self.redis.keys('q_*')
+
+
+    def get_proxies_from_db(self):
+        logging.info("fetching proxies")
+
+
+
+
+
     def sync_from_db(self):
         self.redis.flushall()
         self.redis.save()
@@ -56,51 +85,8 @@ class RedisManager(object):
         self.redis.set('temp_proxy_id',0)
         self.redis.set('temp_detail_id',0)
 
-
-
-
-        queries = {
-            'proxies': 'SELECT * FROM proxies;', 
-            # hold off on details
-            # 'details': 'SELECT * FROM details;',
-            'queues':  'SELECT * FROM queues;'
-        }
-
-        data = {}
-        cursor = self.postgres_manager.cursor()
-
-        logging.info("fetching queues")
-        
-
-        cursor.execute("select * from queues")
-        queues = {r.queue_id: Queue(**r) for r in cursor.fetchall()}
-
-
-        sqid = configuration.app_config['seed_queue']['value']
-        aqid = configuration.app_config['aggregate_queue']['value']
-
-        if sqid in queues:
-            if(queues[sqid].domain != 'SEED_QUEUE'):
-                raise Exception("The domain for the designated queue id should be SEED_QUEUE")
-        else:
-            queues[sqid] = Queue(queue_id=sqid, domain="SEED_QUEUE")
-        
-        if aqid in queues:
-            if(queues[aqid].domain != 'AGGREGATE_QUEUE'):
-                raise Exception("The domain for the designated queue id should be AGGREGATE_QUEUE")
-        else:
-            queues[aqid] = Queue(queue_id=aqid, domain="AGGREGATE_QUEUE")
-
-        for queue_obj in queues.values():
-            self.register_queue(queue_obj)
-        
-        
-
-        
-        for table,query in queries.items():
-            logging.info("executing %s" % query)
-            cursor.execute(query)
-            data[table] = cursor.fetchall()
+        self.get_queues_from_db()
+        self.get_details_from_db()
 
         """    
         proxies = { p['proxy_id']: Proxy(**p) for p in data['proxies'] }
@@ -116,7 +102,7 @@ class RedisManager(object):
 
 
 
-        cursor.close()
+        
         #self.save_to_cache(proxy_object_instances, next_ids)
     
 
