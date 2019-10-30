@@ -4,6 +4,9 @@ services:
     build: .
     ports:
       - "5000:5000"
+    depends_on:
+      - db
+      - redis
   redis:
     image: "redis:alpine"
     ports:

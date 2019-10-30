@@ -4,10 +4,12 @@ import sys
 import os
 import logging
 import time
+import json
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 from psycopg2.extras import DictCursor
+from psycopg2 import sql
 from IPython import embed
 from proxy_objects import Proxy, Detail, Queue
 
@@ -19,6 +21,11 @@ AGGREGATE_QUEUE_ID = configuration.app_config['aggregate_queue']['value']
 LIMIT_ACTIVE = configuration.app_config['active_proxies_per_queue']['value']
 LIMIT_INACTIVE = configuration.app_config['inactive_proxies_per_queue']['value']
 LIMIT_SEED = configuration.app_config['seed_proxies_per_queue']['value']
+SEED_QUEUE_DOMAIN = 'RESERVED_SEED_QUEUE'
+AGGREGATE_QUEUE_DOMAIN = 'RESERVED_AGGREGATE_QUEUE'
+QUEUE_PREFIX = configuration.app_config['redis_queue_char']['value']
+PROXY_PREFIX = configuration.app_config['redis_proxy_char']['value']
+DETAIL_PREFIX = configuration.app_config['redis_detail_char']['value']
 
 
 class PostgresManager(object):
@@ -37,9 +44,87 @@ class PostgresManager(object):
     def do_query(self, query, params=None):
         cursor = self.cursor()
         cursor.execute(query,params)
-        data = cursor.fetchall()
+        try:
+            data = cursor.fetchall()
+        except Exception:
+            pass
         cursor.close()
         return data
+    
+    def db_columns_values(self,obj):
+        obj_dict = obj.to_dict()
+        obj_keys = []
+        obj_vals = []
+        for k,v in obj_dict.items():
+            obj_keys.append(k)
+            obj_vals.append(v)
+
+        columns_str = sql.SQL(', ').join(map(sql.Identifier, obj_keys))
+        values_str = sql.SQL(', ').join([sql.Placeholder(name=k) for k in obj_keys])
+
+        return {'columns': columns_str, 'values': values_str}
+        
+
+    def insert_queue(self,queue, cursor=None):
+        cv = self.db_columns_values(queue)
+        insert = sql.SQL("INSERT INTO queues ({0}) VALUES ({1})").format(cv['columns'], cv['values'])
+        
+        fn = self.do_query
+        if cursor is not None:
+            fn = cursor
+        fn(insert,queue.to_dict())
+        
+        
+        
+    
+    def init_seed_queues(self):
+        params = {'seed':SEED_QUEUE_ID,'agg':AGGREGATE_QUEUE_ID}
+        if(SEED_QUEUE_ID == AGGREGATE_QUEUE_ID):
+            raise Exception("aggregate_queue and seed_queue cannot share the same id.  Check app_config.json")
+        query = "SELECT queue_id from queues WHERE domain = %(domain)s"
+
+        seed_res = self.do_query(query, {'domain':SEED_QUEUE_DOMAIN})
+        agg_res = self.do_query(query, {'domain': AGGREGATE_QUEUE_DOMAIN})
+        
+        
+        if len(seed_res) < 1:
+            self.insert_queue(Queue(domain=SEED_QUEUE_DOMAIN,queue_id=SEED_QUEUE_ID))
+        elif seed_res[0]['queue_id'] != SEED_QUEUE_ID:
+            raise Exception("seed_queue id mismatch. seed_queue should be set to %s  Check app_config.json" % seed_res[0]['queue_id'])
+        if(len(agg_res) < 1):
+            self.insert_queue(Queue(domain=AGGREGATE_QUEUE_DOMAIN, queue_id=AGGREGATE_QUEUE_ID))
+        elif(agg_res[0]['queue_id'] != AGGREGATE_QUEUE_ID):
+            raise Exception("aggregate queue_id mismatch.  aggregate_queue should be set to %s  Check app_config.json" % agg_res[0]['queue_id'])
+        
+
+    def get_queues(self):
+        self.init_seed_queues()
+        queues = [Queue(**r) for r in self.do_query("SELECT * FROM queues;")]
+        return queues
+
+    def insert_detail(self,detail, cursor=None):
+        cv = self.db_columns_values(detail)
+        insert = sql.SQL('INSERT INTO details ({0}) VALUES ({1})').format(cv['columns'], cv['values'])
+        if cursor is None:
+            self.do_query(insert,detail.to_dict())
+        else:
+            cursor.execute(insert,detail.to_dict())
+
+
+    def init_seed_details(self):
+        seed_count = self.do_query("SELECT COUNT(*) as c FROM details WHERE queue_id=%(queue_id)s", {'queue_id':SEED_QUEUE_ID})[0]['c']
+        if seed_count == 0:
+            seed_details = [Detail(proxy=p['proxy_id']) for p in self.do_query("SELECT proxy_id FROM proxies")]
+            cursor = self.cursor()
+            for sd in seed_details:
+                self.insert_detail(sd,cursor)
+            cursor.close()
+        
+    def get_seed_details(self):
+        self.init_seed_details()
+        params = {'seed_queue_id': SEED_QUEUE_ID}
+        return [Detail(**d) for d in self.do_query("SELECT * FROM details WHERE queue_id=%(seed_queue_id)s",params)]
+
 
 
 
@@ -55,7 +140,6 @@ class RedisManager(object):
         self.redis = Redis(**configuration.redis_config)
         self.dbh = PostgresManager()
 
-            
         while self.redis.get('init') is None:
             lock = self.redis.lock('syncing')
             if lock.acquire(blocking=True, blocking_timeout=1):
@@ -67,69 +151,6 @@ class RedisManager(object):
                     except Exception:
                         pass
 
-    def get_queues_from_db(self):
-        logging.info("fetching queues")
-        data = {}
-        
-        query = "SELECT * FROM queues;"
-        queues = {r['queue_id']: Queue(**r) for r in self.dbh.do_query(query)}
-
-        queues[SEED_QUEUE_ID] = Queue(queue_id=SEED_QUEUE_ID, domain="SEED_QUEUE")    
-        queues[AGGREGATE_QUEUE_ID] = Queue(queue_id=AGGREGATE_QUEUE_ID, domain="AGGREGATE_QUEUE")
-
-        for queue_object in queues.values():
-            self.register_queue(queue_object)
-        return queues
-
-    def get_queues_from_cache(self):
-        return self.redis.keys('q_*')
-    
-
-    def get_seed_queue(self):
-        pass
-
-    def get_seed_count(self):
-        query = "SELECT COUNT(*) as detail_count FROM details where queue_id=%(queue_id)s;"
-        params = {'queue_id': SEED_QUEUE_ID}
-        return self.dbh.do_query(query,params)[0]['detail_count']
-        
-
-
-    def init_seeds(self):
-        return []
-        
-
-
-
-
-    def get_proxies_from_db(self):
-        seeds = []
-        seed_count = self.get_seed_count()
-        if(seed_count == 0):
-            seeds = self.init_seeds()
-
-
-        else:
-            seed_proxies_query = """
-                SELECT * FROM details
-                WHERE queue_id = %(seed_queue_id)s
-                AND active = %(active)s
-                ORDER BY last_used ASC
-                LIMIT %(limit)s;
-            """
-            paramms1 = {"seed_queue_id": SEED_QUEUE_ID, "active": True, "limit":LIMIT_ACTIVE}
-            params2 = {"seed_queue_id": SEED_QUEUE_ID, "active": False, "limit":LIMIT_INACTIVE}
-            res1 = self.dbh.do_query(seed_proxies_query, seed_query_params1)
-            res2 = self.dbh.do_query(seed_proxies_query, seed_query_params2)
-            seeds = [Detail(**r) for r in res1+res2]
-
-
-        
-
-
-
-
-
     def sync_from_db(self):
         self.redis.flushall()
         self.redis.save()
@@ -137,8 +158,10 @@ class RedisManager(object):
         self.redis.set('temp_proxy_id',0)
         self.redis.set('temp_detail_id',0)
 
-        self.get_queues_from_db()
-        self.get_proxies_from_db()
+        queues = self.dbh.get_queues()
+        details = self.dbh.get_seed_details()
+
+        
 
     def register_proxy(self, proxy):
         logging.info('register proxy')
@@ -147,6 +170,9 @@ class RedisManager(object):
             self.redis.hmset("tp_%s" % self.redis.incr('temp_proxy_id'), proxy.to_dict())
         else:
             self.redis.hmset('p_%s' % proxy.proxy_id, proxy.to_dict())
+
+    def register_proxy_object(self,prefix_char, proxy_object):
+        print(proxy_object.__class__)
 
 
     def register_queue(self,queue):

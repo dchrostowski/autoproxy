@@ -69,6 +69,16 @@
         "description": "The number of new proxies to try out"
     },
 
+    "redis_proxy_char": {
+        "value": "p"
+    },
+    "redis_detail_char": {
+        "value": "d"
+    },
+    "redis_queue_char": {
+        "value": "q"
+    },
+
     "overrides": {
 
         "queues": {

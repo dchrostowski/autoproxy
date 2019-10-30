@@ -3,30 +3,23 @@ from datetime import datetime
 import time
 from random import randint
 
-
-
 class Proxy(object):
     AVAILABLE_PROTOCOLS = ('http', 'https', 'socks5', 'socks4')
 
     def __init__(self, address, port, protocol='http', proxy_id=None):
         self.address = address
         self.port = port
-
         if protocol not in self.__class__.AVAILABLE_PROTOCOLS:
             raise Exception("Invalid protocol %s" % protocol)
         self.protocol = protocol
-        self._proxy_id = proxy_id
-        self.id = self.proxy_id
+        self.proxy_id = proxy_id
+        
 
     def urlify(self):
         return "%s://%s:%s" % (self.protocol, self.address, self.port)
 
-    @property
-    def proxy_id(self):
-        if(self._proxy_id) is None:
-            print("todo handle proxy id")
-            return None
-        return self._proxy_id
+    def id(self):
+        return self.proxy_id
 
     def to_dict(self):
         return {
@@ -38,10 +31,14 @@ class Proxy(object):
 
 
 class Detail(object):
+    def proxy_object_id(self,object_or_id):
+        if isinstance(object_or_id,int) or object_or_id is None:
+            return object_or_id
+        return object_or_id.id()
 
     def __init__(self, active=False, load_time=None, last_updated=None, last_active=None, last_used=None, bad_count=9, blacklisted=False, blacklisted_count=0, lifetime_good=0, lifetime_bad=0, proxy=None, queue=None, detail_id=None):
         self.active = active
-        self._load_time = load_time
+        self.load_time = load_time
         self.last_active = last_active,
         self.last_used = last_used
         self.bad_count = bad_count
@@ -49,44 +46,17 @@ class Detail(object):
         self.blacklisted_count = blacklisted_count
         self.lifetime_good = lifetime_good
         self.lifetime_bad = lifetime_bad
-        self._detail_id = detail_id
-        self.id = detail_id
-
-        # TO DO
-        if(isinstance(proxy,int)):
-            self.proxy = None
-            self.proxy_id = proxy
-        else:
-            self.proxy_id = proxy.id
-            self.proxy = proxy
-
-        # TO DO
-        if(isinstance(queue,int)):
-            self.queue = None
-            self.queue_id = queue
-
-        else:
-            self.queue_id = queue.id
-            self.queue = queue
-
-    @property
-    def load_time(self):
-        return self._load_time
-
-    @load_time.setter
-    def load_time(self, delta_t):
-        print("load time setter")
-        self._load_time = delta_t.microseconds
-
-    @property
-    def detail_id(self):
-        if(self._detail_id is None):
-            print("todo handle detail id")
-            return None
-        return self._detail_id
+        
+        self.proxy_id = self.proxy_object_id(proxy)
+        self.queue_id = self.proxy_object_id(queue)
+        self.detail_id = detail_id
+    
+    def id(self):
+        return self.detail_id
+    
 
     def to_dict(self):
-        return {
+        obj_dict =  {
             "active": self.active,
             "load_time": self.load_time,
             "last_used": self.last_used,
@@ -95,17 +65,22 @@ class Detail(object):
             "blacklisted_count": self.blacklisted_count,
             "lifetime_good": self.lifetime_good,
             "lifetime_bad": self.lifetime_bad,
-            "detail_id": self.detail_id,
             "proxy_id": self.proxy_id,
             "queue_id": self.queue_id,
-            "detail_id": self.detail_id
         }
+        
+        if self.detail_id is not None:
+            obj_dict.update({'detail_id': self.detail_id})
+        return obj_dict
 
 
 class Queue(object):
     def __init__(self, domain, queue_id=None):
         self.domain = domain
         self.queue_id = queue_id
+
+    def id(self):
+        return self.queue_id
     
     def to_dict(self):
         return {
