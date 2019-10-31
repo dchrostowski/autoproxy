@@ -30,8 +30,9 @@ DETAIL_PREFIX = configuration.app_config['redis_detail_char']['value']
 
 class PostgresManager(object):
     def __init__(self):
-        self.connect_params = configuration.db_config
-        self.connect_params.update({'cursor_factory':DictCursor})
+        connect_params = configuration.db_config
+        connect_params.update({'cursor_factory':DictCursor})
+        self.connect_params = connect_params
 
     def new_connection(self):
         conn = psycopg2.connect(**self.connect_params)
@@ -46,12 +47,12 @@ class PostgresManager(object):
         cursor.execute(query,params)
         try:
             data = cursor.fetchall()
+            return data
         except Exception:
             pass
         cursor.close()
-        return data
     
-    def db_columns_values(self,obj):
+    def sql_columns_placeholders(self,obj):
         obj_dict = obj.to_dict()
         obj_keys = []
         obj_vals = []
@@ -59,42 +60,35 @@ class PostgresManager(object):
             obj_keys.append(k)
             obj_vals.append(v)
 
-        columns_str = sql.SQL(', ').join(map(sql.Identifier, obj_keys))
-        values_str = sql.SQL(', ').join([sql.Placeholder(name=k) for k in obj_keys])
+        column_sql = sql.SQL(', ').join(map(sql.Identifier, obj_keys))
+        placeholder_sql = sql.SQL(', ').join([sql.Placeholder(name=k) for k in obj_keys])
 
-        return {'columns': columns_str, 'values': values_str}
+        return {'column_sql': column_sql, 'placeholder_sql': placeholder_sql}
         
-
     def insert_queue(self,queue, cursor=None):
-        cv = self.db_columns_values(queue)
-        insert = sql.SQL("INSERT INTO queues ({0}) VALUES ({1})").format(cv['columns'], cv['values'])
-        
-        fn = self.do_query
-        if cursor is not None:
-            fn = cursor
-        fn(insert,queue.to_dict())
-        
-        
-        
+        self.insert_object(queue,'queues')
     
     def init_seed_queues(self):
-        params = {'seed':SEED_QUEUE_ID,'agg':AGGREGATE_QUEUE_ID}
         if(SEED_QUEUE_ID == AGGREGATE_QUEUE_ID):
             raise Exception("aggregate_queue and seed_queue cannot share the same id.  Check app_config.json")
-        query = "SELECT queue_id from queues WHERE domain = %(domain)s"
+        
+        seed_queue = Queue(domain=SEED_QUEUE_DOMAIN,queue_id=SEED_QUEUE_ID)
+        agg_queue = Queue(domain=AGGREGATE_QUEUE_DOMAIN, queue_id=AGGREGATE_QUEUE_ID)
 
-        seed_res = self.do_query(query, {'domain':SEED_QUEUE_DOMAIN})
-        agg_res = self.do_query(query, {'domain': AGGREGATE_QUEUE_DOMAIN})
+        query = "SELECT queue_id from queues WHERE domain = %(domain)s"
+        db_seed = self.do_query(query, {'domain':SEED_QUEUE_DOMAIN})
+        db_agg = self.do_query(query, {'domain': AGGREGATE_QUEUE_DOMAIN})
         
         
-        if len(seed_res) < 1:
-            self.insert_queue(Queue(domain=SEED_QUEUE_DOMAIN,queue_id=SEED_QUEUE_ID))
-        elif seed_res[0]['queue_id'] != SEED_QUEUE_ID:
-            raise Exception("seed_queue id mismatch. seed_queue should be set to %s  Check app_config.json" % seed_res[0]['queue_id'])
-        if(len(agg_res) < 1):
-            self.insert_queue(Queue(domain=AGGREGATE_QUEUE_DOMAIN, queue_id=AGGREGATE_QUEUE_ID))
-        elif(agg_res[0]['queue_id'] != AGGREGATE_QUEUE_ID):
-            raise Exception("aggregate queue_id mismatch.  aggregate_queue should be set to %s  Check app_config.json" % agg_res[0]['queue_id'])
+        if len(db_seed) == 0:
+            self.insert_queue(seed_queue)
+        elif db_seed[0]['queue_id'] != SEED_QUEUE_ID:
+            raise Exception("seed_queue id mismatch. seed_queue should be set to %s  Check app_config.json" % db_seed[0]['queue_id'])
+        
+        if len(db_agg) == 0:
+            self.insert_queue(agg_queue)
+        elif(db_agg[0]['queue_id'] != AGGREGATE_QUEUE_ID):
+            raise Exception("aggregate queue_id mismatch.  aggregate_queue should be set to %s  Check app_config.json" % db_agg[0]['queue_id'])
         
 
     def get_queues(self):
@@ -102,13 +96,31 @@ class PostgresManager(object):
         queues = [Queue(**r) for r in self.do_query("SELECT * FROM queues;")]
         return queues
 
+    def insert_object(self,obj,table,cursor=None):
+        table_name = sql.Identifier(table)
+        column_sql = sql.SQL(', ').join(map(sql.Identifier, obj.to_dict().keys()))
+        placeholder_sql = sql.SQL(', ').join(map(sql.Placeholder,obj.to_dict()))
+        
+        insert = sql.SQL('INSERT INTO {0} ({1}) VALUES ({2})').format(table_name,column_sql,placeholder_sql)
+
+        insert_fn = cursor
+        if insert_fn is None:
+            insert_fn = self.do_query
+        
+        insert_fn(insert,obj.to_dict())
+
+
+
     def insert_detail(self,detail, cursor=None):
-        cv = self.db_columns_values(detail)
-        insert = sql.SQL('INSERT INTO details ({0}) VALUES ({1})').format(cv['columns'], cv['values'])
+        self.insert_object(detail,'details')
+        """
+        cp = self.sql_columns_placeholders(detail)
+        insert = sql.SQL('INSERT INTO details ({0}) VALUES ({1})').format(cp['column_sql'], cp['placeholder_sql'])
         if cursor is None:
             self.do_query(insert,detail.to_dict())
         else:
             cursor.execute(insert,detail.to_dict())
+        """
 
 
     def init_seed_details(self):
@@ -159,7 +171,10 @@ class RedisManager(object):
         self.redis.set('temp_detail_id',0)
 
         queues = self.dbh.get_queues()
-        details = self.dbh.get_seed_details()
+        for q in queues:
+            self.register_queue(q)
+        
+        seed_details = self.dbh.get_seed_details()
 
         
 
@@ -177,7 +192,6 @@ class RedisManager(object):
 
     def register_queue(self,queue):
         logging.info("register_queue")
-        redis_id = None
         if queue.queue_id is None:
             self.redis.hmset("tq_%s" % self.redis.incr('temp_queue_id'), queue.to_dict())
         else:

@@ -22,12 +22,14 @@ class Proxy(object):
         return self.proxy_id
 
     def to_dict(self):
-        return {
+        obj_dict = {
             "address": self.address,
             "port":  self.port,
             "protocol": self.protocol,
-            "proxy_id": self.proxy_id
         }
+
+        if self.proxy_id is not None:
+            obj_dict.update({'proxy_id', self.proxy_id})
 
 
 class Detail(object):
@@ -83,10 +85,14 @@ class Queue(object):
         return self.queue_id
     
     def to_dict(self):
-        return {
+        obj_dict = {
             "domain": self.domain,
-            "queue_id": self.queue_id
         }
+
+        if(self.queue_id is not None):
+            obj_dict.update({"queue_id": self.queue_id})
+        
+        return obj_dict
 
 
 
