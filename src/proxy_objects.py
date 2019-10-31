@@ -2,6 +2,8 @@ from IPython import embed
 from datetime import datetime
 import time
 from random import randint
+import inspect
+import re
 
 class Proxy(object):
     AVAILABLE_PROTOCOLS = ('http', 'https', 'socks5', 'socks4')
@@ -38,30 +40,70 @@ class Detail(object):
             return object_or_id
         return object_or_id.id()
 
-    def __init__(self, active=False, load_time=None, last_updated=None, last_active=None, last_used=None, bad_count=9, blacklisted=False, blacklisted_count=0, lifetime_good=0, lifetime_bad=0, proxy=None, queue=None, detail_id=None):
-        self.active = active
+    def __init__(self, active=False, load_time=None, last_updated=None, last_active=None, last_used=None, bad_count=9, blacklisted=False, blacklisted_count=0, lifetime_good=0, lifetime_bad=0, proxy_id=None, queue_id=None, detail_id=None):
+        self._active = active
         self.load_time = load_time
-        self.last_active = last_active,
-        self.last_used = last_used
+        self._last_active = last_active,
+        self._last_used = last_used
         self.bad_count = bad_count
         self.blacklisted = blacklisted
         self.blacklisted_count = blacklisted_count
         self.lifetime_good = lifetime_good
         self.lifetime_bad = lifetime_bad
         
-        self.proxy_id = self.proxy_object_id(proxy)
-        self.queue_id = self.proxy_object_id(queue)
+        self.proxy_id = self.proxy_object_id(proxy_id)
+        self.queue_id = self.proxy_object_id(queue_id)
         self.detail_id = detail_id
+
+        self.calling_class = None
     
     def id(self):
         return self.detail_id
+
+    @property
+    def active(self):
+
+        return self._active
+    
+    @active.setter
+    def active(self,val):
+        self._active = val
+
+    @property
+    def last_active(self):
+        stack = inspect.stack()
+        calling_class = str(stack[1][0].f_locals["self"].__class__)
+        print("calling class: %s" % calling_class)
+        return self._last_active
+        return self._last_active
+
+    @last_active.setter
+    def last_active(self,val):
+        if val is None:
+            self._last_active = datetime.fromtimestamp(0)
+        self._last_active = val
+
+    @property
+    def last_used(self):
+        return self._last_used
+
+    @last_used.setter
+    def last_used(self,val):
+        self._last_used = val
     
 
     def to_dict(self):
+        stack = inspect.stack()
+        calling_class = str(stack[1][0].f_locals["self"].__class__)
+        try:
+            self.calling_class = re.search(r'\.(.+)\'>$',calling_class).group(1)
+        except: self.calling_class = None
+
         obj_dict =  {
             "active": self.active,
             "load_time": self.load_time,
             "last_used": self.last_used,
+            "last_active": self.last_active,
             "bad_count": self.bad_count,
             "blacklisted": self.blacklisted,
             "blacklisted_count": self.blacklisted_count,

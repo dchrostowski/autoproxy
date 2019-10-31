@@ -26,6 +26,9 @@ AGGREGATE_QUEUE_DOMAIN = 'RESERVED_AGGREGATE_QUEUE'
 QUEUE_PREFIX = configuration.app_config['redis_queue_char']['value']
 PROXY_PREFIX = configuration.app_config['redis_proxy_char']['value']
 DETAIL_PREFIX = configuration.app_config['redis_detail_char']['value']
+ACTIVE_LIMIT = configuration.app_config['active_proxies_per_queue']['value']
+INACTIVE_LIMIT = configuration.app_config['inactive_proxies_per_queue']['value']
+SEED_LIMIT = configuration.app_config['seed_proxies_per_queue']['value']
 
 # decorator for RedisManager methods
 def block_if_syncing(func):
@@ -88,7 +91,7 @@ class PostgresManager(object):
     def init_seed_details(self):
         seed_count = self.do_query("SELECT COUNT(*) as c FROM details WHERE queue_id=%(queue_id)s", {'queue_id':SEED_QUEUE_ID})[0]['c']
         if seed_count == 0:
-            seed_details = [Detail(proxy=p['proxy_id']) for p in self.do_query("SELECT proxy_id FROM proxies")]
+            seed_details = [Detail(proxy_id=p['proxy_id'], queue_id=SEED_QUEUE_ID) for p in self.do_query("SELECT proxy_id FROM proxies")]
             cursor = self.cursor()
             for sd in seed_details:
                 self.insert_detail(sd,cursor)
@@ -97,8 +100,20 @@ class PostgresManager(object):
     def get_seed_details(self):
         self.init_seed_details()
         params = {'seed_queue_id': SEED_QUEUE_ID}
-        active =  [Detail(**d) for d in self.do_query("SELECT * FROM details WHERE queue_id=%(seed_queue_id)s",params)]
-        inactive = [Detail(**d) for d in self.do_query("SELECT * FROM details WHERE queue_id=%(seed_queue_id)s",params)]
+        query= """
+            SELECT * FROM details 
+            WHERE queue_id=%(queue_id)s
+            AND active=%(active)s
+            ORDER BY last_used DESC
+            LIMIT %(limit)s;
+            """
+        a_params = {"queue_id":SEED_QUEUE_ID, "active":True,"limit": ACTIVE_LIMIT}
+        ia_params = {"queue_id":SEED_QUEUE_ID, "active":False,"limit": INACTIVE_LIMIT}
+        active =  [Detail(**d) for d in self.do_query(query,a_params)]
+        inactive = [Detail(**d) for d in self.do_query(query,ia_params)]
+        
+        return active + inactive
+
 
 
 
@@ -154,6 +169,11 @@ class RedisManager(object):
             self.register_queue(q)
         
         seed_details = self.dbh.get_seed_details()
+        logging.info("got details")
+        embed()
+        for d in seed_details:
+            self.register_detail(d)
+
     
     
     def register_object(self,key,obj):

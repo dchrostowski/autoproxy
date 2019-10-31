@@ -14,8 +14,8 @@ CREATE TABLE queues (
 
 CREATE TABLE details (
     "detail_id" SERIAL PRIMARY KEY,
-    "proxy_id" INTEGER REFERENCES proxies("proxy_id"),
-    "queue_id" INTEGER REFERENCES queues("queue_id"),
+    "proxy_id" INTEGER REFERENCES proxies("proxy_id") NOT NULL,
+    "queue_id" INTEGER REFERENCES queues("queue_id") NOT NULL,
     "active" BOOLEAN DEFAULT false,
     "load_time" INT,
     "last_updated" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
