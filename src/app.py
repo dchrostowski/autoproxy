@@ -2,7 +2,7 @@ import time
 import os
 import sys
 import redis
-from storage_manager import cache
+#from storage_manager import cache
 from flask import Flask
 
 
@@ -25,4 +25,5 @@ def get_hit_count():
 def hello():
     
     count = get_hit_count()
-    return 'Hello World! I have been seen {} times.\n'.format(count)
+    return 'hello world'
+    #return 'Hello World! I have been seen {} times.\n'.format(count)

@@ -1,6 +1,7 @@
 from IPython import embed
 import time
-from storage_manager import cache
+from storage_manager import RedisManager
+rm = RedisManager()
 
 
 embed()
