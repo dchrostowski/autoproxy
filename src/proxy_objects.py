@@ -18,7 +18,8 @@ class Proxy(object):
         if protocol not in self.__class__.AVAILABLE_PROTOCOLS:
             raise Exception("Invalid protocol %s" % protocol)
         self.protocol = protocol
-        self.proxy_id = proxy_id
+        ifn = lambda x: int(x) if x is not None else None
+        self.proxy_id = ifn(proxy_id)
         
 
     def urlify(self):
@@ -70,7 +71,8 @@ class Detail(object):
         
         self.proxy_id = self.proxy_object_id(proxy_id)
         self.queue_id = self.proxy_object_id(queue_id)
-        self.detail_id = detail_id
+        ifn = lambda x: int(x) if x is not None else None
+        self.detail_id = ifn(detail_id)
 
         self.calling_class = None
     
@@ -158,7 +160,8 @@ class Detail(object):
 class Queue(object):
     def __init__(self, domain, queue_id=None):
         self.domain = domain
-        self.queue_id = queue_id
+        ifn = lambda x: int(x) if x is not None else None
+        self.queue_id = ifn(queue_id)
 
     def id(self):
         return self.queue_id
