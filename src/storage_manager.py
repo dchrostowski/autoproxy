@@ -6,6 +6,7 @@ import logging
 import time
 import json
 from functools import wraps
+from urllib.parse import urlparse
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 from psycopg2.extras import DictCursor
@@ -29,12 +30,14 @@ DETAIL_PREFIX = configuration.app_config['redis_detail_char']['value']
 ACTIVE_LIMIT = configuration.app_config['active_proxies_per_queue']['value']
 INACTIVE_LIMIT = configuration.app_config['inactive_proxies_per_queue']['value']
 SEED_LIMIT = configuration.app_config['seed_proxies_per_queue']['value']
+TEMP_ID_COUNTER = 'temp_id_counter'
 
 # decorator for RedisManager methods
 def block_if_syncing(func):
     @wraps(func)
     def wrapper(self,*args,**kwargs):
-        while self.redis.get('syncing') is not None:
+        while self.is_syncing() and not self.is_sync_client():
+            logging.info('awaiting sync...')
             time.sleep(1)
         return(func(self,*args,**kwargs))
     return wrapper
@@ -139,6 +142,7 @@ class PostgresManager(object):
             raise Exception("aggregate queue_id mismatch.  aggregate_queue should be set to %s  Check app_config.json" % db_agg[0]['queue_id'])
         
 
+
     def get_queues(self):
         self.init_seed_queues()
         queues = [Queue(**r) for r in self.do_query("SELECT * FROM queues;")]
@@ -156,13 +160,23 @@ class RedisManager(object):
         if len(self.redis.keys()) == 0:
             lock = self.redis.lock('syncing')
             if lock.acquire(blocking=True, blocking_timeout=0):
+                self.redis.client_setname('syncer')
                 self.sync_from_db()
+                self.redis.client_setname('')
                 lock.release()
 
+    def is_sync_client(self):
+        return self.redis.client_getname() == 'syncer'
+
+    def is_syncing(self):
+        return self.redis.get('syncing') is not None
+
+    @block_if_syncing
     def sync_from_db(self):
-        self.redis.set(QUEUE_PREFIX,0)
-        self.redis.set(PROXY_PREFIX,0)
-        self.redis.set(DETAIL_PREFIX,0)
+        self.redis.set("%s_%s" % (TEMP_ID_COUNTER, QUEUE_PREFIX),0)
+        self.redis.set("%s_%s" % (TEMP_ID_COUNTER, PROXY_PREFIX),0)
+        self.redis.set("%s_%s" % (TEMP_ID_COUNTER, DETAIL_PREFIX),0)
+        self.redis.delete('detail_ids')
 
         queues = self.dbh.get_queues()
         for q in queues:
@@ -170,28 +184,56 @@ class RedisManager(object):
         
         seed_details = self.dbh.get_seed_details()
         logging.info("got details")
-        for d in seed_details:
-            self.register_detail(d)
 
+        for d in seed_details:
+            self.register_detail(d) 
     
-    
+    @block_if_syncing
     def register_object(self,key,obj):
         redis_key = key
         if obj.id() is None:
-            redis_key += 't_%s' % self.redis.incr(key)
+            temp_counter_key = "%s_%s" % (TEMP_ID_COUNTER, key)
+            redis_key += 't_%s' % self.redis.incr(temp_counter_key)
         else:
             redis_key += '_%s' % obj.id()
         
         self.redis.hmset(redis_key,obj.to_dict())
+        return redis_key
 
-    
     def register_queue(self,queue):
-        self.register_object(QUEUE_PREFIX,queue)
+        redis_key = self.register_object(QUEUE_PREFIX,queue)
+        return queue
     
+    @block_if_syncing    
     def register_detail(self,detail):
-        self.register_object(DETAIL_PREFIX,detail)
+        detail_key = self.register_object(DETAIL_PREFIX,detail)
+        self.redis.lpush('detail_ids',detail_key)
     
     @block_if_syncing
     def increment_foo(self):
         print(self.redis.incr('foo'))
+
+    @block_if_syncing
+    def get_all_queues(self):
+        return [Queue(**self.redis.hgetall(q)) for q in self.redis.keys('q*')]
+
+    @block_if_syncing
+    def get_all_temp_id_queues(self):
+        return [Queue(**self.redis.hgetall(q)) for q in self.redis.keys("qt*")]
+
+
+class StorageManager(object):
+    def __init__(self):
+        self.redis_mgr = RedisManager()
+        self.db_mgr = PostgresManager()
+
+    def create_queue(self,url):
+        parsed = urlparse(url)
+        all_queues_by_domain = {queue.domain: queue for queue in self.redis_mgr.get_all_queues()}
+
+        if parsed.netloc in all_queues_by_domain:
+            return all_queues_by_domain[parsed.netloc]
+        else:
+            return self.redis_mgr.register_queue(Queue(domain=parsed.netloc))
+
 
