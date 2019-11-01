@@ -4,30 +4,9 @@ import time
 from random import randint
 import inspect
 import re
-
 # 1/1/2000
 DEFAULT_TIMESTAMP = datetime.fromtimestamp(946684800)
-
-def redis_boolean_out(bool_val):
-    if bool_val:
-        return 1
-    return 0
-
-def redis_boolean_in(bool_val):
-    if bool_val == 1:
-        return True
-    if bool_val==0:
-        return False
-
-def redis_timestamp_out(dt):
-    if dt is None:
-        dt = DEFAULT_TIMESTAMP
-    return dt.isoformat()
-
-def redis_timestamp_in(dt):
-    if dt is None:
-        dt = DEFAULT_TIMESTAMP
-    return datetime.fromisoformat(dt)
+BOOLEAN_VALS = (True,1,False,0)
 
 
 class Proxy(object):
@@ -71,20 +50,15 @@ class Detail(object):
         get_class = lambda idx: re.search(r'\.(.+)\'>$',str(stack[idx][0].f_locals["self"].__class__)).group(1)
         calling_class = get_class(idx)
         while(calling_class == 'Detail' and idx < 20):
-            print(calling_class)
             idx +=1
             calling_class = get_class(idx)
 
         return calling_class
 
-    def __init__(self, active=False, load_time=None, last_updated=None, last_active=DEFAULT_TIMESTAMP, last_used=DEFAULT_TIMESTAMP, bad_count=0, blacklisted=False, blacklisted_count=0, lifetime_good=0, lifetime_bad=0, proxy_id=None, queue_id=None, detail_id=None):
+    def __init__(self, active=False, load_time=60000, last_updated=None, last_active=DEFAULT_TIMESTAMP, last_used=DEFAULT_TIMESTAMP, bad_count=0, blacklisted=False, blacklisted_count=0, lifetime_good=0, lifetime_bad=0, proxy_id=None, queue_id=None, detail_id=None):
         self._active = active
         self.load_time = load_time
-        print(last_active)
-        embed()
-        self._last_active = last_active,
-        print(self._last_active)
-        embed()
+        self._last_active = last_active
         self._last_used = last_used
         self.bad_count = bad_count
         self.blacklisted = blacklisted
@@ -103,41 +77,61 @@ class Detail(object):
 
     @property
     def active(self):
-
-        return self._active
+        return self.format_boolean(self.get_caller(),self._active)
     
     @active.setter
     def active(self,val):
-        self._active = val
+        self._active = self.parse_boolean(val)
+
+    @property
+    def blacklisted(self):
+        return self.format_boolean(self.get_caller(),self._blacklisted)
+    
+    @blacklisted.setter
+    def blacklisted(self,val):
+        self._blacklisted = self.parse_boolean(val)
 
     @property
     def last_active(self):
-        if self.get_caller() == 'Foo':
-            embed()
-            return redis_timestamp_out(self._last_active)
-        else:
-            return self._last_active
+        return self.format_timestamp(self.get_caller(),self._last_active)
 
     @last_active.setter
     def last_active(self,val):
-        if self.get_caller() == 'Foo':
-            val = redis_timestamp_in(val)
-            print(val)
-            embed()
-        self._last_active = val
+        self._last_active = self.parse_timestamp(val)
 
     @property
     def last_used(self):
-        if self.get_caller() == 'Foo':
-            return redis_timestamp_out(self._last_used)
-        return self._last_used
+        return self.format_timestamp(self.get_caller(),self._last_used)
 
     @last_used.setter
     def last_used(self,val):
-        if self.get_caller() == 'Foo':
-            val = redis_timestamp_in(val)
-        self._last_used = val
+       self._last_used = self.parse_timestamp(val)
+
+    def format_timestamp(self,caller,val):
+        if caller == 'RedisManager':
+            return val.isoformat()
+        return val
+
+    def parse_timestamp(self,val):
+        if type(val) is str:
+            return datetime.fromisoformat(val)
     
+    def format_boolean(self,caller,val):
+        if caller == 'RedisManager':
+            if val == True:
+                return 1
+            return 0
+        return val
+
+    def parse_boolean(self,val):
+        if val not in BOOLEAN_VALS:
+            raise Exception("Invalid value for active")
+        if(val == 1):
+            val = True
+        elif(val == 0):
+            val = False
+        return val
+            
 
     def to_dict(self):
         obj_dict =  {
