@@ -170,7 +170,6 @@ class RedisManager(object):
         
         seed_details = self.dbh.get_seed_details()
         logging.info("got details")
-        embed()
         for d in seed_details:
             self.register_detail(d)
 
