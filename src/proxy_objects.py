@@ -6,7 +6,7 @@ import inspect
 import re
 # 1/1/2000
 DEFAULT_TIMESTAMP = datetime.fromtimestamp(946684800)
-BOOLEAN_VALS = (True,1,False,0)
+BOOLEAN_VALS = (True,'1',False,'0')
 
 
 class Proxy(object):
@@ -41,6 +41,8 @@ class Detail(object):
     def proxy_object_id(self,object_or_id):
         if isinstance(object_or_id,int) or object_or_id is None:
             return object_or_id
+        if isinstance(object_or_id, str):
+            return int(object_or_id)
         return object_or_id.id()
 
     def get_caller(self):
@@ -126,9 +128,9 @@ class Detail(object):
     def parse_boolean(self,val):
         if val not in BOOLEAN_VALS:
             raise Exception("Invalid value for active")
-        if(val == 1):
+        if(val == '1'):
             val = True
-        elif(val == 0):
+        elif(val == '0'):
             val = False
         return val
             
