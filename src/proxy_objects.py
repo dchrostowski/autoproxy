@@ -4,11 +4,13 @@ import time
 from random import randint
 import inspect
 import re
+from autoproxy_config.config import configuration
 # 1/1/2000
 DEFAULT_TIMESTAMP = datetime.fromtimestamp(946684800)
 BOOLEAN_VALS = (True,'1',False,'0')
 
-
+QUEUE_PREFIX = configuration.app_config['redis_queue_char']['value']
+PROXY_PREFIX = configuration.app_config['redis_proxy_char']['value']
 class Proxy(object):
     AVAILABLE_PROTOCOLS = ('http', 'https', 'socks5', 'socks4')
 
@@ -36,7 +38,8 @@ class Proxy(object):
         }
 
         if self.proxy_id is not None:
-            obj_dict.update({'proxy_id', self.proxy_id})
+            obj_dict.update({'proxy_id': self.proxy_id})
+        return obj_dict
 
 class Detail(object):
     def proxy_object_id(self,object_or_id):
@@ -50,15 +53,22 @@ class Detail(object):
         stack = inspect.stack()
         idx=0
         #get_method = lambda idx: stack[idx][0].f_code.co_name
+        
         get_class = lambda idx: re.search(r'\.(.+)\'>$',str(stack[idx][0].f_locals["self"].__class__)).group(1)
-        calling_class = get_class(idx)
+        try:
+            calling_class = get_class(idx)
+        except KeyError:
+            return 'Detail'
         while(calling_class == 'Detail' and idx < 20):
             idx +=1
-            calling_class = get_class(idx)
+            try:
+                calling_class = get_class(idx)
+            except KeyError:
+                return 'Detail'
 
         return calling_class
 
-    def __init__(self, active=False, load_time=60000, last_updated=None, last_active=DEFAULT_TIMESTAMP, last_used=DEFAULT_TIMESTAMP, bad_count=0, blacklisted=False, blacklisted_count=0, lifetime_good=0, lifetime_bad=0, proxy_id=None, queue_id=None, detail_id=None):
+    def __init__(self, active=False, load_time=60000, last_updated=None, last_active=DEFAULT_TIMESTAMP, last_used=DEFAULT_TIMESTAMP, bad_count=0, blacklisted=False, blacklisted_count=0, lifetime_good=0, lifetime_bad=0, proxy_id=None, queue_id=None, detail_id=None, queue_key=None, proxy_key=None):
         self._active = active
         self.load_time = load_time
         self._last_active = last_active
@@ -71,11 +81,38 @@ class Detail(object):
         
         self.proxy_id = self.proxy_object_id(proxy_id)
         self.queue_id = self.proxy_object_id(queue_id)
+        self._proxy_key = proxy_key
+        self._queue_key = queue_key
+
         ifn = lambda x: int(x) if x is not None else None
         self.detail_id = ifn(detail_id)
 
         self.calling_class = None
     
+    @property
+    def proxy_key(self):
+        if self._proxy_key is None and self.proxy_id is not None:
+            self._proxy_key = "%s_%s" % (PROXY_PREFIX,self.proxy_id)
+        return self._proxy_key
+        
+    
+    @proxy_key.setter
+    def proxy_key(self,pkey):
+        self._proxy_key = pkey
+
+    @property
+    def queue_key(self):
+        if self._queue_key is None and self.queue_id is not None:
+            self._queue_key = "%s_%s" % (QUEUE_PREFIX,self.queue_id)
+        return self._queue_key
+        
+    
+    @proxy_key.setter
+    def proxy_key(self,qkey):
+        self._queue_key = qkey
+
+
+
     def id(self):
         return self.detail_id
 

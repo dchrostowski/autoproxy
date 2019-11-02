@@ -5,6 +5,7 @@ import os
 import logging
 import time
 import json
+import re
 from functools import wraps
 from urllib.parse import urlparse
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
@@ -42,7 +43,6 @@ def block_if_syncing(func):
         return(func(self,*args,**kwargs))
     return wrapper
 
-
 class PostgresManager(object):
     def __init__(self):
         connect_params = configuration.db_config
@@ -74,15 +74,16 @@ class PostgresManager(object):
         
         insert = sql.SQL('INSERT INTO {0} ({1}) VALUES ({2})').format(table_name,column_sql,placeholder_sql)
 
-        insert_fn = cursor
-        if insert_fn is None:
-            insert_fn = self.do_query
-        
-        insert_fn(insert,obj.to_dict())
+
+        if cursor is not None:
+            cursor.execute(insert,obj.to_dict())
+        else:
+            self.do_query(insert,obj.to_dict())
+
 
 
     def insert_detail(self,detail, cursor=None):
-        self.insert_object(detail,'details')
+        self.insert_object(detail,'details',cursor)
 
     def insert_queue(self,queue, cursor=None):
         self.insert_object(queue,'queues')
@@ -90,15 +91,25 @@ class PostgresManager(object):
     def insert_proxy(self,proxy,cursor=None):
         self.insert_object(proxy,'proxies')
 
-
     def init_seed_details(self):
         seed_count = self.do_query("SELECT COUNT(*) as c FROM details WHERE queue_id=%(queue_id)s", {'queue_id':SEED_QUEUE_ID})[0]['c']
+        logging.info("initializing seed proxies")
+        cursor = self.cursor()
         if seed_count == 0:
             seed_details = [Detail(proxy_id=p['proxy_id'], queue_id=SEED_QUEUE_ID) for p in self.do_query("SELECT proxy_id FROM proxies")]
-            cursor = self.cursor()
             for sd in seed_details:
                 self.insert_detail(sd,cursor)
-            cursor.close()
+        
+        query = """
+        BEGIN;
+        LOCK TABLE details IN EXCLUSIVE MODE;
+        SELECT setval('details_detail_id_seq', COALESCE((SELECT MAX(detail_id) FROM details),1), false);
+        COMMIT;
+        """
+        
+        cursor.execute(query)
+        cursor.close()
+        logging.info("done initializing seeds")
         
     def get_seed_details(self):
         self.init_seed_details()
@@ -121,6 +132,7 @@ class PostgresManager(object):
 
 
     def init_seed_queues(self):
+        logging.info("Initializing queues...")
         if(SEED_QUEUE_ID == AGGREGATE_QUEUE_ID):
             raise Exception("aggregate_queue and seed_queue cannot share the same id.  Check app_config.json")
         
@@ -140,17 +152,70 @@ class PostgresManager(object):
             self.insert_queue(agg_queue)
         elif(db_agg[0]['queue_id'] != AGGREGATE_QUEUE_ID):
             raise Exception("aggregate queue_id mismatch.  aggregate_queue should be set to %s  Check app_config.json" % db_agg[0]['queue_id'])
+
+        cursor = self.cursor()
+        query = """
+        BEGIN;
+        LOCK TABLE queues IN EXCLUSIVE MODE;
+        SELECT setval('queues_queue_id_seq', COALESCE((SELECT MAX(queue_id) FROM queues),1), false);
+        COMMIT;
+        """
+        cursor.execute(query)
+        cursor.close()
+        logging.info("Finished initializing queue.")
         
 
 
     def get_queues(self):
         self.init_seed_queues()
-        queues = [Queue(**r) for r in self.do_query("SELECT * FROM queues;")]
-        return queues
+        return [Queue(**r) for r in self.do_query("SELECT * FROM queues;")]
+        
+
+    def get_proxies(self):
+        return [Proxy(**p) for p in self.do_query("SELECT * FROM proxies")]
 
 class Redis(redis.Redis):
     def __init__(self,*args,**kwargs):
         super().__init__(decode_responses=True,*args,**kwargs)
+
+class RedisDetailQueueEmpty(Exception):
+    pass
+class RedisDetailQueueInvalid(Exception):
+    pass
+
+class RedisDetailQueue(object):
+    def __init__(self,queue_key):
+        self.redis = Redis(**configuration.redis_config)
+        self.queue_key = queue_key
+        self.redis_key = 'redis_detail_queue_%s' % queue_key
+    
+    def is_empty(self):
+        if self.redis.keys(self.redis_key) is None:
+            return True
+        elif self.redis.llen(self.redis_key) == 0:
+            return True
+        else:
+            return False
+
+    def enqueue(self,detail_key):
+        detail_queue_key = self.redis.hgetall(detail_key)['queue_key']
+
+        if detail_queue_key != self.queue_key:
+            raise RedisDetailQueueInvalid("No such queue key for detail")
+        
+        self.redis.rpush(self.redis_key,detail_key)
+
+    def dequeue(self):
+        if self.is_empty():
+            raise RedisDetailQueueEmpty("No proxies available for queue id %s" % self.queue_id)
+        return Detail(**self.redis.hgetall(self.redis.rpop(self.redis_key)))
+
+    def clear(self):
+        self.redis.delete(self.redis_key)
+    
+
+
+
 
 class RedisManager(object):
     def __init__(self):
@@ -181,12 +246,18 @@ class RedisManager(object):
         queues = self.dbh.get_queues()
         for q in queues:
             self.register_queue(q)
+
+        proxies = self.dbh.get_proxies()
+        for p in proxies:
+            self.register_proxy(p)
         
         seed_details = self.dbh.get_seed_details()
         logging.info("got details")
 
         for d in seed_details:
-            self.register_detail(d) 
+            #d.queue_key = "%s_%s" % (QUEUE_PREFIX,SEED_QUEUE_ID)
+            #d.proxy_key = "%s_%s" % (PROXY_PREFIX,PROXY_QUEUE_ID
+            self.register_detail(d)
     
     @block_if_syncing
     def register_object(self,key,obj):
@@ -201,17 +272,37 @@ class RedisManager(object):
         return redis_key
 
     def register_queue(self,queue):
+        logging.info("registering queue")
         redis_key = self.register_object(QUEUE_PREFIX,queue)
+        
         return queue
+
+    def register_proxy(self,proxy):
+        logging.info("registering proxy")
+        redis_key = self.register_object(PROXY_PREFIX,proxy)
+        return proxy
     
     @block_if_syncing    
     def register_detail(self,detail):
+        logging.info("registering detail")
+        if detail.proxy_key is None or detail.queue_key is None:
+            raise Exception('detail object must have a proxy and queue key')
+        if(self.redis.keys(detail.proxy_key) is None or self.redis.keys(detail.queue_key) is None):
+            raise Exception("Unable to locate queue or proxy for detail")
+        relational_keys = {'proxy_key': detail.proxy_key, 'queue_key': detail.queue_key}
         detail_key = self.register_object(DETAIL_PREFIX,detail)
-        self.redis.lpush('detail_ids',detail_key)
+        self.redis.hmset(detail_key, relational_keys)
+        rdq = RedisDetailQueue(detail.queue_key)
+        rdq.enqueue(detail_key)
+        #self.redis.lpush('detail_queue',detail_key)
     
     @block_if_syncing
     def increment_foo(self):
         print(self.redis.incr('foo'))
+
+    @block_if_syncing
+    def get_detail(self,redis_detail_key):
+        return Detail(**self.redis.hgetall(redis_detail_key))
 
     @block_if_syncing
     def get_all_queues(self):
@@ -229,11 +320,14 @@ class StorageManager(object):
 
     def create_queue(self,url):
         parsed = urlparse(url)
+        domain = re.search(r'([^\.]+\.[^\.]+$)',parsed.netloc).group(1)
         all_queues_by_domain = {queue.domain: queue for queue in self.redis_mgr.get_all_queues()}
+        if domain in all_queues_by_domain:
+            return all_queues_by_domain[domain]
+        
+        return self.redis_mgr.register_queue(Queue(domain=domain))
 
-        if parsed.netloc in all_queues_by_domain:
-            return all_queues_by_domain[parsed.netloc]
-        else:
-            return self.redis_mgr.register_queue(Queue(domain=parsed.netloc))
+    def create_proxy(self,address,port,protocol):
+        pass
 
 
