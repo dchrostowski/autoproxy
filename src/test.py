@@ -11,6 +11,14 @@ print(temp_queues)
 
 
 rdq = RedisDetailQueue(queue_key="q_1")
-while not rdq.is_empty():
+embed()
+
+for i in range(6):
     detail = rdq.dequeue()
-    print(detail.last_used)
+    print("---------------------------")
+    print("detail key: %s" % detail.detail_key)
+    print("detail id: %s" % detail.detail_id)
+    print("detail last used: %s" % detail.last_used)
+    print("-----------------------------")
+    rdq.enqueue(detail)
+    embed()

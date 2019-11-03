@@ -11,10 +11,11 @@ BOOLEAN_VALS = (True,'1',False,'0')
 
 QUEUE_PREFIX = configuration.app_config['redis_queue_char']['value']
 PROXY_PREFIX = configuration.app_config['redis_proxy_char']['value']
+DETAIL_PREFIX = configuration.app_config['redis_detail_char']['value']
 class Proxy(object):
     AVAILABLE_PROTOCOLS = ('http', 'https', 'socks5', 'socks4')
 
-    def __init__(self, address, port, protocol='http', proxy_id=None):
+    def __init__(self, address, port, protocol='http', proxy_id=None, proxy_key=None):
         self.address = address
         self.port = port
         if protocol not in self.__class__.AVAILABLE_PROTOCOLS:
@@ -29,6 +30,16 @@ class Proxy(object):
 
     def id(self):
         return self.proxy_id
+
+    @property
+    def proxy_key(self):
+        if self._proxy_key is None and self.proxy_id is not None:
+            self._proxy_key = "%s_%s" % (PROXY_PREFIX,self.proxy_id)
+        return self._proxy_key
+        
+    @proxy_key.setter
+    def proxy_key(self,pkey):
+        self._proxy_key = pkey
 
     def to_dict(self):
         obj_dict = {
@@ -68,7 +79,7 @@ class Detail(object):
 
         return calling_class
 
-    def __init__(self, active=False, load_time=60000, last_updated=None, last_active=DEFAULT_TIMESTAMP, last_used=DEFAULT_TIMESTAMP, bad_count=0, blacklisted=False, blacklisted_count=0, lifetime_good=0, lifetime_bad=0, proxy_id=None, queue_id=None, detail_id=None, queue_key=None, proxy_key=None):
+    def __init__(self, active=False, load_time=60000, last_updated=None, last_active=DEFAULT_TIMESTAMP, last_used=DEFAULT_TIMESTAMP, bad_count=0, blacklisted=False, blacklisted_count=0, lifetime_good=0, lifetime_bad=0, proxy_id=None, queue_id=None, detail_id=None, queue_key=None, proxy_key=None, detail_key=None):
         self._active = active
         self.load_time = load_time
         self._last_active = last_active
@@ -105,11 +116,14 @@ class Detail(object):
         if self._queue_key is None and self.queue_id is not None:
             self._queue_key = "%s_%s" % (QUEUE_PREFIX,self.queue_id)
         return self._queue_key
-        
-    
-    @proxy_key.setter
-    def proxy_key(self,qkey):
+            
+    @queue_key.setter
+    def queue_key(self,qkey):
         self._queue_key = qkey
+
+    @property
+    def detail_key(self):
+        return "%s_%s_%s" % (DETAIL_PREFIX,self.queue_key,self.proxy_key)
 
 
 
@@ -195,13 +209,24 @@ class Detail(object):
 
 
 class Queue(object):
-    def __init__(self, domain, queue_id=None):
+    def __init__(self, domain, queue_id=None, queue_key=None):
         self.domain = domain
         ifn = lambda x: int(x) if x is not None else None
         self.queue_id = ifn(queue_id)
+        self._queue_key = queue_key
 
     def id(self):
         return self.queue_id
+
+    @property
+    def queue_key(self):
+        if self._queue_key is None and self.queue_id is not None:
+            self._queue_key = "%s_%s" % (QUEUE_PREFIX,self.queue_id)
+        return self._queue_key
+            
+    @queue_key.setter
+    def proxy_key(self,qkey):
+        self._queue_key = qkey
     
     def to_dict(self):
         obj_dict = {

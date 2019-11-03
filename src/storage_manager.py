@@ -118,7 +118,7 @@ class PostgresManager(object):
             SELECT * FROM details 
             WHERE queue_id=%(queue_id)s
             AND active=%(active)s
-            ORDER BY last_used DESC
+            ORDER BY last_used ASC
             LIMIT %(limit)s;
             """
         a_params = {"queue_id":SEED_QUEUE_ID, "active":True,"limit": ACTIVE_LIMIT}
@@ -174,6 +174,20 @@ class PostgresManager(object):
     def get_proxies(self):
         return [Proxy(**p) for p in self.do_query("SELECT * FROM proxies")]
 
+    def get_detail_by_queue_and_proxy(self,queue_id,proxy_id):
+        query = "SELECT * FROM details WHERE proxy_id=%(proxy_id)s AND queue_id=%(queue_id)s"
+        params = {'queue_id': queue_id, 'proxy_id':proxy_id}
+        cursor = self.cursor()
+        cursor.execute(query,params)
+        detail_data = cursor.fetchone()
+        if detail_data is None:
+            cursor.close()
+            return None
+        detail = Detail(**detail_data)
+        cursor.close()
+        return detail
+        
+
 class Redis(redis.Redis):
     def __init__(self,*args,**kwargs):
         super().__init__(decode_responses=True,*args,**kwargs)
@@ -197,8 +211,9 @@ class RedisDetailQueue(object):
         else:
             return False
 
-    def enqueue(self,detail_key):
-        detail_queue_key = self.redis.hgetall(detail_key)['queue_key']
+    def enqueue(self,detail):
+        detail_key = detail.detail_key
+        detail_queue_key = self.redis.hget(detail_key,'queue_key')
 
         if detail_queue_key != self.queue_key:
             raise RedisDetailQueueInvalid("No such queue key for detail")
@@ -208,7 +223,7 @@ class RedisDetailQueue(object):
     def dequeue(self):
         if self.is_empty():
             raise RedisDetailQueueEmpty("No proxies available for queue id %s" % self.queue_id)
-        return Detail(**self.redis.hgetall(self.redis.rpop(self.redis_key)))
+        return Detail(**self.redis.hgetall(self.redis.lpop(self.redis_key)))
 
     def clear(self):
         self.redis.delete(self.redis_key)
@@ -273,28 +288,45 @@ class RedisManager(object):
 
     def register_queue(self,queue):
         logging.info("registering queue")
-        redis_key = self.register_object(QUEUE_PREFIX,queue)
+        queue_key = self.register_object(QUEUE_PREFIX,queue)
+        self.redis.hmset(queue_key, {'queue_key': queue_key})
         
-        return queue
+        return Queue(**self.redis.hgetall(queue_key))
 
     def register_proxy(self,proxy):
         logging.info("registering proxy")
-        redis_key = self.register_object(PROXY_PREFIX,proxy)
-        return proxy
+        proxy_key = self.register_object(PROXY_PREFIX,proxy)
+        self.redis.hmset(proxy_key, {'proxy_key': proxy_key})
+
+
+        return Proxy(**self.redis.hgetall(proxy_key))
     
     @block_if_syncing    
     def register_detail(self,detail):
         logging.info("registering detail")
+        
         if detail.proxy_key is None or detail.queue_key is None:
             raise Exception('detail object must have a proxy and queue key')
         if(self.redis.keys(detail.proxy_key) is None or self.redis.keys(detail.queue_key) is None):
             raise Exception("Unable to locate queue or proxy for detail")
+        print("register detail")
+
+        detail_key = detail.detail_key
+        
+        print("register detail check detail key")
+        if self.redis.exists(detail.detail_key):
+            logging.warn("Detail already exists")
+            return Detail(**self.redis.hgetall(detail_key))
+        else:
+            self.redis.hmset(detail_key, detail.to_dict())
+        
         relational_keys = {'proxy_key': detail.proxy_key, 'queue_key': detail.queue_key}
-        detail_key = self.register_object(DETAIL_PREFIX,detail)
         self.redis.hmset(detail_key, relational_keys)
         rdq = RedisDetailQueue(detail.queue_key)
-        rdq.enqueue(detail_key)
-        #self.redis.lpush('detail_queue',detail_key)
+        rdq.enqueue(detail)
+
+        return Detail(**self.redis.hgetall(detail_key))
+        
     
     @block_if_syncing
     def increment_foo(self):
@@ -319,15 +351,61 @@ class StorageManager(object):
         self.db_mgr = PostgresManager()
 
     def create_queue(self,url):
+        logging.info("creating queue for %s" % url)
         parsed = urlparse(url)
         domain = re.search(r'([^\.]+\.[^\.]+$)',parsed.netloc).group(1)
         all_queues_by_domain = {queue.domain: queue for queue in self.redis_mgr.get_all_queues()}
+        print("all queues by domain:")
         if domain in all_queues_by_domain:
             return all_queues_by_domain[domain]
         
         return self.redis_mgr.register_queue(Queue(domain=domain))
 
-    def create_proxy(self,address,port,protocol):
-        pass
+    def create_proxy(self, address, port, protocol):
+        proxy_keys = self.redis_mgr.keys('p*')
+        for pkey in proxy_keys:
+            if self.redis_mgr.hget(pkey,'address') == address and self.redis_mgr.hget(pkey,'port'):
+                return Proxy(**self.redis_mgr.hgetall(pkey))
+
+        proxy = Proxy(address=address,port=port,protocol=protocol)
+        proxy = self.redis_mgr.register_proxy(proxy)
+        proxy_key = proxy.proxy_key
+        queue_key = "%s_%s" % (QUEUE_PREFIX,SEED_QUEUE_ID)
+        detail = Detail(proxy_key=proxy_key,queue_id=SEED_QUEUE_ID,queue_key=queue_key)
+        self.redis_mgr.register_detail(detail)
+
+
+
+
+    def clone_detail(detail,new_queue_key):
+        if detail.queue_id != SEED_QUEUE_ID:
+            raise Exception("can only clone details from seed queue")
+        if self.redis_mgr.redis.keys(new_queue_key is None):
+            raise Exception("Invalid queue key while cloning detail")
+        
+        
+        new_queue_id = self.redis_mgr.redis.hget(new_queue_key,'queue_id')
+        proxy_id = detail.proxy_id
+        detail._queue_id = new_queue_id
+        new_detail_key = detail.detail_key
+
+        if self.redis_mgr.redis.keys(new_detail_key) is not None:
+            logging.warn("trying to clone a detail into a queue where it already exists.")
+            return Detail(**self.redis_mgr.redis.hgetall(new_detail_key))
+
+        if new_queue_id is not None and proxy_id is not None:
+            db_detail = self.db_mgr.get_detail_by_queue_and_proxy(new_queue_id,proxy_id)
+            if db_detail is not None:
+                logging.warn("Attempting to clone a detail that already exists")
+                return self.redis_mgr.register_detail(db_detail)
+                
+        return self.redis_mgr.register_detail(detail)
+
+        
+
+
+        
+        
+        
 
 
