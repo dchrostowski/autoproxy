@@ -18,7 +18,6 @@ class ConfigReader(dict):
             
             with open("%s/%s" % (config_dir,f)) as ifh:
 
-                print("CONFIG FILE IS %s" % f)
                 config_data = json.load(ifh)
                 config_key = re.search(file_regex,f).group(1) 
                 self.update({config_key: config_data})

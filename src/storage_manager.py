@@ -204,7 +204,7 @@ class RedisDetailQueue(object):
         self.redis_key = 'redis_detail_queue_%s' % queue_key
     
     def is_empty(self):
-        if self.redis.keys(self.redis_key) is None:
+        if not self.redis.exists(self.redis_key):
             return True
         elif self.redis.llen(self.redis_key) == 0:
             return True
@@ -223,7 +223,12 @@ class RedisDetailQueue(object):
     def dequeue(self):
         if self.is_empty():
             raise RedisDetailQueueEmpty("No proxies available for queue id %s" % self.queue_id)
-        return Detail(**self.redis.hgetall(self.redis.lpop(self.redis_key)))
+        detail = Detail(**self.redis.hgetall(self.redis.lpop(self.redis_key)))
+        self.enqueue(detail)
+        return detail
+
+    def length(self):
+        return self.redis.llen(self.redis_key)
 
     def clear(self):
         self.redis.delete(self.redis_key)
@@ -301,15 +306,14 @@ class RedisManager(object):
 
         return Proxy(**self.redis.hgetall(proxy_key))
     
-    @block_if_syncing    
+    @block_if_syncing
     def register_detail(self,detail):
         logging.info("registering detail")
         
         if detail.proxy_key is None or detail.queue_key is None:
             raise Exception('detail object must have a proxy and queue key')
-        if(self.redis.keys(detail.proxy_key) is None or self.redis.keys(detail.queue_key) is None):
+        if not self.redis.exists(detail.proxy_key) or not self.redis.exists(detail.queue_key):
             raise Exception("Unable to locate queue or proxy for detail")
-        print("register detail")
 
         detail_key = detail.detail_key
         
@@ -326,11 +330,6 @@ class RedisManager(object):
         rdq.enqueue(detail)
 
         return Detail(**self.redis.hgetall(detail_key))
-        
-    
-    @block_if_syncing
-    def increment_foo(self):
-        print(self.redis.incr('foo'))
 
     @block_if_syncing
     def get_detail(self,redis_detail_key):
@@ -355,7 +354,6 @@ class StorageManager(object):
         parsed = urlparse(url)
         domain = re.search(r'([^\.]+\.[^\.]+$)',parsed.netloc).group(1)
         all_queues_by_domain = {queue.domain: queue for queue in self.redis_mgr.get_all_queues()}
-        print("all queues by domain:")
         if domain in all_queues_by_domain:
             return all_queues_by_domain[domain]
         
@@ -374,22 +372,20 @@ class StorageManager(object):
         detail = Detail(proxy_key=proxy_key,queue_id=SEED_QUEUE_ID,queue_key=queue_key)
         self.redis_mgr.register_detail(detail)
 
-
-
-
-    def clone_detail(detail,new_queue_key):
+    def clone_detail(self,detail,new_queue):
+        new_queue_key = new_queue.queue_key
         if detail.queue_id != SEED_QUEUE_ID:
             raise Exception("can only clone details from seed queue")
-        if self.redis_mgr.redis.keys(new_queue_key is None):
+        if not self.redis_mgr.redis.exists(new_queue_key):
             raise Exception("Invalid queue key while cloning detail")
-        
         
         new_queue_id = self.redis_mgr.redis.hget(new_queue_key,'queue_id')
         proxy_id = detail.proxy_id
-        detail._queue_id = new_queue_id
-        new_detail_key = detail.detail_key
+        cloned = Detail(proxy_id=proxy_id,queue_id=new_queue_id,queue_key=new_queue_key)
+        
+        new_detail_key = cloned.detail_key
 
-        if self.redis_mgr.redis.keys(new_detail_key) is not None:
+        if self.redis_mgr.redis.exists(new_detail_key):
             logging.warn("trying to clone a detail into a queue where it already exists.")
             return Detail(**self.redis_mgr.redis.hgetall(new_detail_key))
 
@@ -398,8 +394,8 @@ class StorageManager(object):
             if db_detail is not None:
                 logging.warn("Attempting to clone a detail that already exists")
                 return self.redis_mgr.register_detail(db_detail)
-                
-        return self.redis_mgr.register_detail(detail)
+        
+        return self.redis_mgr.register_detail(cloned)
 
         
 

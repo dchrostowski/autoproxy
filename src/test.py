@@ -3,22 +3,20 @@ import time
 from storage_manager import StorageManager, RedisManager, RedisDetailQueue
 
 sm = StorageManager()
-q = sm.create_queue('https://www.google.com')
-q = sm.create_queue('https://streetscrape.com')
-print(q)
-temp_queues = sm.redis_mgr.get_all_temp_id_queues()
-print(temp_queues)
+tq1 = sm.create_queue('https://www.google.com')
+tq2 = sm.create_queue('https://streetscrape.com')
+rdq1 = RedisDetailQueue(queue_key='q_1')
+rdq2 = RedisDetailQueue(queue_key=tq1.queue_key)
+cloned = []
+for i in range(rdq1.length()):
+    detail_to_clone = rdq1.dequeue()
+    clone = sm.clone_detail(detail_to_clone,tq1)
+    cloned.append(detail_to_clone)
 
+for c in cloned:
+    rdq1.enqueue(c)
 
-rdq = RedisDetailQueue(queue_key="q_1")
+dup_clone = sm.clone_detail(cloned[0],tq1)
 embed()
 
-for i in range(6):
-    detail = rdq.dequeue()
-    print("---------------------------")
-    print("detail key: %s" % detail.detail_key)
-    print("detail id: %s" % detail.detail_id)
-    print("detail last used: %s" % detail.last_used)
-    print("-----------------------------")
-    rdq.enqueue(detail)
-    embed()
+
