@@ -18,4 +18,8 @@ def flip_coin(prob):
         return True
     return False
 
+def update_blacklist_status(detail):
+    print(detail.blacklisted)
+    embed()
+
     

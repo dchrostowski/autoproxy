@@ -8,6 +8,7 @@ import json
 import re
 from functools import wraps
 from copy import deepcopy
+from datetime import datetime
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 from psycopg2.extras import DictCursor
@@ -17,22 +18,26 @@ from proxy_objects import Proxy, Detail, Queue
 from util import parse_domain
 
 from autoproxy_config.config import configuration
+app_config = lambda config_val: configuration.app_config[config_val]['value']
 
-
-SEED_QUEUE_ID = configuration.app_config['seed_queue']['value']
-AGGREGATE_QUEUE_ID = configuration.app_config['aggregate_queue']['value']
-LIMIT_ACTIVE = configuration.app_config['active_proxies_per_queue']['value']
-LIMIT_INACTIVE = configuration.app_config['inactive_proxies_per_queue']['value']
-LIMIT_SEED = configuration.app_config['seed_proxies_per_queue']['value']
-SEED_QUEUE_DOMAIN = parse_domain(configuration.app_config['designated_endpoint']['value'])
+SEED_QUEUE_ID = app_config('seed_queue')
+AGGREGATE_QUEUE_ID = app_config('aggregate_queue')
+LIMIT_ACTIVE = app_config('active_proxies_per_queue')
+LIMIT_INACTIVE = app_config('inactive_proxies_per_queue')
+LIMIT_SEED = app_config('seed_proxies_per_queue')
+SEED_QUEUE_DOMAIN = parse_domain(app_config('designated_endpoint'))
 AGGREGATE_QUEUE_DOMAIN = 'RESERVED_AGGREGATE_QUEUE'
-QUEUE_PREFIX = configuration.app_config['redis_queue_char']['value']
-PROXY_PREFIX = configuration.app_config['redis_proxy_char']['value']
-DETAIL_PREFIX = configuration.app_config['redis_detail_char']['value']
-ACTIVE_LIMIT = configuration.app_config['active_proxies_per_queue']['value']
-INACTIVE_LIMIT = configuration.app_config['inactive_proxies_per_queue']['value']
-SEED_LIMIT = configuration.app_config['seed_proxies_per_queue']['value']
+QUEUE_PREFIX = app_config('redis_queue_char')
+PROXY_PREFIX = app_config('redis_proxy_char')
+DETAIL_PREFIX = app_config('redis_detail_char')
+ACTIVE_LIMIT = app_config('active_proxies_per_queue')
+INACTIVE_LIMIT = app_config('inactive_proxies_per_queue')
+SEED_LIMIT = app_config('seed_proxies_per_queue')
 TEMP_ID_COUNTER = 'temp_id_counter'
+
+BLACKLIST_THRESHOLD = app_config('blacklist_threshold')
+MAX_BLACKLIST_COUNT = app_config('max_blacklist_count')
+BLACKLIST_TIME = app_config('blacklist_time')
 
 # decorator for RedisManager methods
 def block_if_syncing(func):
@@ -205,6 +210,19 @@ class RedisDetailQueue(object):
         if not active:
             active_clause = "inactive"
         self.redis_key = 'redis_%s_detail_queue_%s' % (active_clause, queue_key)
+
+
+    def _update_blacklist_status(self,detail):
+        if detail.blacklisted:
+            last_used = detail.last_used
+            now = datetime.now()
+            delta_t = now - last_used
+            if delta_t.microseconds/1000 > BLACKLIST_TIME and detail.blacklisted_count < MAX_BLACKLIST_COUNT:
+                logging.info("unblacklisting detail")
+                detail.blacklisted = False
+
+                self.redis.sadd('changed_details',detail.detail_key)
+        
     
     def is_empty(self):
         if not self.redis.exists(self.redis_key):
@@ -215,7 +233,11 @@ class RedisDetailQueue(object):
             return False
 
     def enqueue(self,detail):
-
+        self._update_blacklist_status(detail)
+        if detail.blacklisted:
+            logging.warn("detail is blacklisted, will not enqueue")
+            return
+        
         detail_key = detail.detail_key
         detail_queue_key = self.redis.hget(detail_key,'queue_key')
 
@@ -224,11 +246,12 @@ class RedisDetailQueue(object):
         
         self.redis.rpush(self.redis_key,detail_key)
 
-    def dequeue(self):
+    def dequeue(self,requeue=True):
         if self.is_empty():
             raise RedisDetailQueueEmpty("No proxies available for queue id %s" % self.queue_id)
         detail = Detail(**self.redis.hgetall(self.redis.lpop(self.redis_key)))
-        self.enqueue(detail)
+        if requeue:
+            self.enqueue(detail)
         return detail
 
     def length(self):
@@ -352,6 +375,12 @@ class RedisManager(object):
         
         return self.register_queue(Queue(domain=domain))
 
+    def get_queue_by_id(self,qid):
+        lookup_key = "%s_%s" % (QUEUE_PREFIX,qid)
+        if not self.redis.exists(lookup_key):
+            raise Exception("No such queue with id %s" % qid)
+        return Queue(**self.redis.hgetall(lookup_key))            
+
     def get_proxy(self,proxy_key):
         return Proxy(**self.redis.hgetall(proxy_key))
 
@@ -452,12 +481,11 @@ class StorageManager(object):
                 d.queue_id = queue_keys_to_id[d.queue_key]
             self.db_mgr.insert_detail(d,cursor)
             
+        changed_detials = [Detail(**self.redis_mgr.redis.hgetall(d)) for d in self.redis_mgr.redis.smembers('changed_details')]
         
         logging.info("synced redis cache to database, resetting cache.")
-
-        changed_detials = [Detail(**self.redis_mgr.redis.hgetall(d)) for d in self.redis_mgr.redis.smembers('changed_details')]
         cursor.close()
-        self.redis_mgr.redis.flushall()
+        #self.redis_mgr.redis.flushall()
 
         
 

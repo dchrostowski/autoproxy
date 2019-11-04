@@ -4,16 +4,29 @@ import time
 from random import randint
 import inspect
 import re
+import sys
+import logging
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 from autoproxy_config.config import configuration
 # 1/1/2000
 DEFAULT_TIMESTAMP = datetime.fromtimestamp(946684800)
 BOOLEAN_VALS = (True,'1',False,'0')
+app_config = lambda config_val: configuration.app_config[config_val]['value']
 
-QUEUE_PREFIX = configuration.app_config['redis_queue_char']['value']
-PROXY_PREFIX = configuration.app_config['redis_proxy_char']['value']
-DETAIL_PREFIX = configuration.app_config['redis_detail_char']['value']
-BLACKLIST_THRESHOLD = configuration.app_config['blacklist_threshold']['value']
-DECREMENT_BLACKLIST = configuration.app_config['decrement_blacklist']['value']
+
+QUEUE_PREFIX = app_config('redis_queue_char')
+PROXY_PREFIX = app_config('redis_proxy_char')
+DETAIL_PREFIX = app_config('redis_detail_char')
+BLACKLIST_THRESHOLD = app_config('blacklist_threshold')
+DECREMENT_BLACKLIST = app_config('decrement_blacklist')
+MAX_BLACKLIST_COUNT = app_config('max_blacklist_count')
+SEED_FREQUENCY =  app_config('seed_frequency')
+MIN_ACTIVE = app_config('min_active')
+INACTIVE_PCT = app_config('inactive_pct')
+SYNC_INTERVAL = app_config('sync_interval')
+ACTIVE_PROXIES_PER_QUEUE = app_config('active_proxies_per_queue')
+INACTIVE_PROXIES_PER_QUEUE = app_config('inactive_proxies_per_queue')
+SEED_PROXIES_PER_QUEUE = app_config('seed_proxies_per_queue')
 
 class Proxy(object):
     AVAILABLE_PROTOCOLS = ('http', 'https', 'socks5', 'socks4')
@@ -217,22 +230,7 @@ class Detail(object):
             obj_dict.update({'queue_id': self.queue_id})
         return obj_dict
 
-    def decrement_bad_count(self):
-        if self.bad_count > 0:
-            self.bad_count -= 1
-            self.decrement_blacklisted_count()
-    
-    def increment_bad_count(self):
-        self.bad_count += 1
-        self.lifetime_bad += 1
-        if self.bad_count > BLACKLIST_THRESHOLD:
-            self.blacklisted = True
-            self.blacklisted_count += 1
-            self.bad_count = 0
-
-    def decrement_blacklist_count(self):
-        if DECREMENT_BLACKLIST and self.blacklisted_count > 0:
-            self.blacklisted_count -= 1
+ 
 
     
     
@@ -268,7 +266,24 @@ class Queue(object):
         
         return obj_dict
 
+"""
+   def decrement_bad_count(self):
+        if self.bad_count > 0:
+            self.bad_count -= 1
+            self.decrement_blacklisted_count()
+    
+    def increment_bad_count(self):
+        self.bad_count += 1
+        self.lifetime_bad += 1
+        if self.bad_count > BLACKLIST_THRESHOLD:
+            self.blacklisted = True
+            self.blacklisted_count += 1
+            self.bad_count = 0
 
+    def decrement_blacklist_count(self):
+        if DECREMENT_BLACKLIST and self.blacklisted_count > 0:
+            self.blacklisted_count -= 1
+"""
 
 class ProxyObject(Proxy):
     def __init__(self, storage_manager, detail):
@@ -287,17 +302,26 @@ class ProxyObject(Proxy):
 
         if success:
             load_time_delta = datetime.now() - self.dispatch_time
-            self.detail.load_time = load_time_delta.microseconds
+            self.detail.load_time = load_time_delta.microseconds/1000
             self.detail.active = True
             self.detail.last_active = datetime.now()
-            self.detail.decrement_bad_count()
+            #self.detail.decrement_bad_count()
             self.detail.lifetime_good += 1
+            if DECREMENT_BLACKLIST:
+                self.detail.blacklisted_count -= 1
         else:
-            self.detail.increment_bad_count()
+            self.detail.bad_count += 1
+            self.detail.lifetime_bad += 1
+            if self.detail.bad_count > BLACKLIST_THRESHOLD:
+                logging.info("blacklisting detail")
+                self.detail.blacklisted = True
+                self.detail.active = False
+                self.detail.blacklisted_count += 1
+
 
         
         self.storage_mgr.redis_mgr.update_detail(self.detail)
-        print("saved detail (key:%s)" % self.detail.detail_key )
+        logging.info("Saved detail to cache")
 
 
 
