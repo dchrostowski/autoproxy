@@ -7,7 +7,6 @@ import time
 import json
 import re
 from functools import wraps
-from urllib.parse import urlparse
 from copy import deepcopy
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
@@ -15,6 +14,7 @@ from psycopg2.extras import DictCursor
 from psycopg2 import sql
 from IPython import embed
 from proxy_objects import Proxy, Detail, Queue
+from util import parse_domain
 
 from autoproxy_config.config import configuration
 
@@ -24,7 +24,7 @@ AGGREGATE_QUEUE_ID = configuration.app_config['aggregate_queue']['value']
 LIMIT_ACTIVE = configuration.app_config['active_proxies_per_queue']['value']
 LIMIT_INACTIVE = configuration.app_config['inactive_proxies_per_queue']['value']
 LIMIT_SEED = configuration.app_config['seed_proxies_per_queue']['value']
-SEED_QUEUE_DOMAIN = 'RESERVED_SEED_QUEUE'
+SEED_QUEUE_DOMAIN = parse_domain(configuration.app_config['designated_endpoint']['value'])
 AGGREGATE_QUEUE_DOMAIN = 'RESERVED_AGGREGATE_QUEUE'
 QUEUE_PREFIX = configuration.app_config['redis_queue_char']['value']
 PROXY_PREFIX = configuration.app_config['redis_proxy_char']['value']
@@ -68,12 +68,13 @@ class PostgresManager(object):
             pass
         cursor.close()
 
-    def insert_object(self,obj,table,cursor=None):
+    def insert_object(self,obj,table,returning, cursor=None):
         table_name = sql.Identifier(table)
         column_sql = sql.SQL(', ').join(map(sql.Identifier, obj.to_dict().keys()))
         placeholder_sql = sql.SQL(', ').join(map(sql.Placeholder,obj.to_dict()))
+        returning = sql.Identifier(returning)
         
-        insert = sql.SQL('INSERT INTO {0} ({1}) VALUES ({2})').format(table_name,column_sql,placeholder_sql)
+        insert = sql.SQL('INSERT INTO {0} ({1}) VALUES ({2}) RETURNING {3}').format(table_name,column_sql,placeholder_sql, returning)
 
 
         if cursor is not None:
@@ -84,13 +85,13 @@ class PostgresManager(object):
 
 
     def insert_detail(self,detail, cursor=None):
-        self.insert_object(detail,'details',cursor)
+        self.insert_object(detail,'details', 'detail_id',cursor)
 
     def insert_queue(self,queue, cursor=None):
-        self.insert_object(queue,'queues')
+        self.insert_object(queue,'queues','queue_id', cursor)
 
     def insert_proxy(self,proxy,cursor=None):
-        self.insert_object(proxy,'proxies')
+        self.insert_object(proxy,'proxies','proxy_id',cursor)
 
     def init_seed_details(self):
         seed_count = self.do_query("SELECT COUNT(*) as c FROM details WHERE queue_id=%(queue_id)s", {'queue_id':SEED_QUEUE_ID})[0]['c']
@@ -104,7 +105,7 @@ class PostgresManager(object):
         query = """
         BEGIN;
         LOCK TABLE details IN EXCLUSIVE MODE;
-        SELECT setval('details_detail_id_seq', COALESCE((SELECT MAX(detail_id) FROM details),1), false);
+        SELECT setval('details_detail_id_seq', COALESCE((SELECT MAX(detail_id)+1 FROM details),1), false);
         COMMIT;
         """
         
@@ -158,7 +159,7 @@ class PostgresManager(object):
         query = """
         BEGIN;
         LOCK TABLE queues IN EXCLUSIVE MODE;
-        SELECT setval('queues_queue_id_seq', COALESCE((SELECT MAX(queue_id) FROM queues),1), false);
+        SELECT setval('queues_queue_id_seq', COALESCE((SELECT MAX(queue_id)+1 FROM queues),1), false);
         COMMIT;
         """
         cursor.execute(query)
@@ -350,8 +351,7 @@ class StorageManager(object):
 
     def create_queue(self,url):
         logging.info("creating queue for %s" % url)
-        parsed = urlparse(url)
-        domain = re.search(r'([^\.]+\.[^\.]+$)',parsed.netloc).group(1)
+        domain = parse_domain(url)
         all_queues_by_domain = {queue.domain: queue for queue in self.redis_mgr.get_all_queues()}
         if domain in all_queues_by_domain:
             logging.warn("Trying to create a queue that already exists.")
@@ -407,6 +407,38 @@ class StorageManager(object):
                 return self.redis_mgr.register_detail(db_detail)
 
         return self.redis_mgr.register_detail(cloned)
+
+
+    def sync_to_db(self):
+        new_queues = [Queue(**self.redis_mgr.redis.hgetall(q)) for q in self.redis_mgr.redis.keys("qt_*")]
+        new_proxies = [Proxy(**self.redis_mgr.redis.hgetall(p)) for p in self.redis_mgr.redis.keys("pt_*")]
+        new_detail_keys = set(self.redis_mgr.redis.keys('d_qt*') + self.redis_mgr.redis.keys('d_*pt*'))
+        new_details = [Detail(**self.redis_mgr.redis.hgetall(d)) for d in list(new_detail_keys)]
+
+        cursor = self.db_mgr.cursor()
+
+        queue_keys_to_id = {}
+        proxy_keys_to_id = {}
+        for q in new_queues:
+            self.db_mgr.insert_queue(q,cursor)
+            queue_id = cursor.fetchone()[0]
+            queue_keys_to_id[q.queue_key] = queue_id
+
+        for p in new_proxies:
+            self.db_mgr.insert_proxy(p,cursor)
+            proxy_id = cursor.fetchone()[0]
+            proxy_keys_to_id[p.proxy_key] = proxy_id
+
+        for d in new_details:
+            if d.proxy_id is None:
+                d.proxy_id = proxy_keys_to_id[d.proxy_key]
+            if d.queue_id is None:
+                d.queue_id = queue_keys_to_id[d.queue_key]
+            self.db_mgr.insert_detail(d,cursor)
+            
+        cursor.close()
+        logging.info("synced redis cache to database, resetting cache.")
+        self.redis_mgr.redis.flushall()
 
         
 
