@@ -23,6 +23,7 @@ class Proxy(object):
         self.protocol = protocol
         ifn = lambda x: int(x) if x is not None else None
         self.proxy_id = ifn(proxy_id)
+        self._proxy_key = proxy_key
         
 
     def urlify(self):
@@ -69,7 +70,6 @@ class Detail(object):
         try:
             calling_class = get_class(idx)
         except KeyError:
-            embed()
             return 'Detail'
         while(calling_class == 'Detail' and idx < 20):
             idx +=1
@@ -103,7 +103,7 @@ class Detail(object):
     
     @property
     def proxy_key(self):
-        if self._proxy_key is None and self.proxy_id is not None:
+        if self.proxy_id is not None:
             self._proxy_key = "%s_%s" % (PROXY_PREFIX,self.proxy_id)
         return self._proxy_key
         
@@ -114,7 +114,7 @@ class Detail(object):
 
     @property
     def queue_key(self):
-        if self._queue_key is None and self.queue_id is not None:
+        if self.queue_id is not None:
             self._queue_key = "%s_%s" % (QUEUE_PREFIX,self.queue_id)
         return self._queue_key
             

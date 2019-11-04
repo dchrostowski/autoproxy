@@ -8,6 +8,7 @@ import json
 import re
 from functools import wraps
 from urllib.parse import urlparse
+from copy import deepcopy
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 from psycopg2.extras import DictCursor
@@ -212,6 +213,7 @@ class RedisDetailQueue(object):
             return False
 
     def enqueue(self,detail):
+
         detail_key = detail.detail_key
         detail_queue_key = self.redis.hget(detail_key,'queue_key')
 
@@ -233,9 +235,6 @@ class RedisDetailQueue(object):
     def clear(self):
         self.redis.delete(self.redis_key)
     
-
-
-
 
 class RedisManager(object):
     def __init__(self):
@@ -311,13 +310,13 @@ class RedisManager(object):
         logging.info("registering detail")
         
         if detail.proxy_key is None or detail.queue_key is None:
+            rdq1 = RedisDetailQueue(queue_key='q_1')
             raise Exception('detail object must have a proxy and queue key')
         if not self.redis.exists(detail.proxy_key) or not self.redis.exists(detail.queue_key):
             raise Exception("Unable to locate queue or proxy for detail")
 
         detail_key = detail.detail_key
         
-        print("register detail check detail key")
         if self.redis.exists(detail.detail_key):
             logging.warn("Detail already exists")
             return Detail(**self.redis.hgetall(detail_key))
@@ -360,20 +359,26 @@ class StorageManager(object):
         return self.redis_mgr.register_queue(Queue(domain=domain))
 
     def create_proxy(self, address, port, protocol):
-        proxy_keys = self.redis_mgr.keys('p*')
+        proxy_keys = self.redis_mgr.redis.keys('p*')
         for pkey in proxy_keys:
-            if self.redis_mgr.hget(pkey,'address') == address and self.redis_mgr.hget(pkey,'port'):
-                return Proxy(**self.redis_mgr.hgetall(pkey))
+            if self.redis_mgr.redis.hget(pkey,'address') == address and self.redis_mgr.redis.hget(pkey,'port'):
+                logging.warn("Trying to create a proxy that already exists")
+                return Proxy(**self.redis_mgr.redis.hgetall(pkey))
 
         proxy = Proxy(address=address,port=port,protocol=protocol)
         proxy = self.redis_mgr.register_proxy(proxy)
         proxy_key = proxy.proxy_key
         queue_key = "%s_%s" % (QUEUE_PREFIX,SEED_QUEUE_ID)
         detail = Detail(proxy_key=proxy_key,queue_id=SEED_QUEUE_ID,queue_key=queue_key)
+        
+        
         self.redis_mgr.register_detail(detail)
+        
+        return proxy
 
     def clone_detail(self,detail,new_queue):
         new_queue_key = new_queue.queue_key
+        
         if detail.queue_id != SEED_QUEUE_ID:
             raise Exception("can only clone details from seed queue")
         if not self.redis_mgr.redis.exists(new_queue_key):
@@ -381,7 +386,11 @@ class StorageManager(object):
         
         new_queue_id = self.redis_mgr.redis.hget(new_queue_key,'queue_id')
         proxy_id = detail.proxy_id
-        cloned = Detail(proxy_id=proxy_id,queue_id=new_queue_id,queue_key=new_queue_key)
+        proxy_key = detail.proxy_key
+        
+        cloned = Detail(proxy_id=proxy_id,queue_id=new_queue_id,queue_key=new_queue_key, proxy_key=proxy_key)
+        
+        
         
         new_detail_key = cloned.detail_key
 
@@ -394,7 +403,7 @@ class StorageManager(object):
             if db_detail is not None:
                 logging.warn("Attempting to clone a detail that already exists")
                 return self.redis_mgr.register_detail(db_detail)
-        
+
         return self.redis_mgr.register_detail(cloned)
 
         
