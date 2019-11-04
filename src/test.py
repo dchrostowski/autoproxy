@@ -10,15 +10,15 @@ tq1 = sm.create_queue('https://www.google.com')
 rdq2 = RedisDetailQueue(queue_key=tq1.queue_key)
 
 
-for i in range(20):
+for i in range(5000):
     detail_to_clone = rdq1.dequeue()
     clone = sm.clone_detail(detail_to_clone,tq1)
 
 for i in range(rdq2.length()):
     detail = rdq2.dequeue()
-    print("-----------------------")
-    print(detail.to_dict())
-    print("-----------------------")
+    #print("-----------------------")
+    #print(detail.to_dict())
+    #print("-----------------------")
     
 
 

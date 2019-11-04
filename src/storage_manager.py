@@ -354,6 +354,7 @@ class StorageManager(object):
         domain = re.search(r'([^\.]+\.[^\.]+$)',parsed.netloc).group(1)
         all_queues_by_domain = {queue.domain: queue for queue in self.redis_mgr.get_all_queues()}
         if domain in all_queues_by_domain:
+            logging.warn("Trying to create a queue that already exists.")
             return all_queues_by_domain[domain]
         
         return self.redis_mgr.register_queue(Queue(domain=domain))
@@ -387,9 +388,10 @@ class StorageManager(object):
         new_queue_id = self.redis_mgr.redis.hget(new_queue_key,'queue_id')
         proxy_id = detail.proxy_id
         proxy_key = detail.proxy_key
-        
+        print("new quueue key:" + new_queue_key)
         cloned = Detail(proxy_id=proxy_id,queue_id=new_queue_id,queue_key=new_queue_key, proxy_key=proxy_key)
-        
+        print("cloned detail key")
+        print(cloned.detail_key)
         
         
         new_detail_key = cloned.detail_key
