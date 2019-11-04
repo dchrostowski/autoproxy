@@ -73,6 +73,18 @@ class PostgresManager(object):
             pass
         cursor.close()
 
+    def update_detail(self,obj,cursor=None):
+        table_name = sql.Identifier('details')
+        obj_dict = obj.to_dict()
+        del obj_dict['detail_id']
+        where_sql = sql.SQL("{0}={1}").format(sql.Identifier('detail_id'),sql.Placeholder('detail_id'))        
+        set_sql = sql.SQL(', ').join([sql.SQL("{0}={1}").format(sql.Identifier(k),sql.Placeholder(k)) for k in obj_dict.keys()])
+        update = sql.SQL('UPDATE {0} SET {1} WHERE {2}').format(table_name,set_sql,where_sql)
+        if cursor is not None:
+            cursor.execute(update,obj.to_dict())
+        else:
+            self.do_query(update,obj.to_dict())
+
     def insert_object(self,obj,table,returning, cursor=None):
         table_name = sql.Identifier(table)
         column_sql = sql.SQL(', ').join(map(sql.Identifier, obj.to_dict().keys()))
@@ -248,7 +260,7 @@ class RedisDetailQueue(object):
 
     def dequeue(self,requeue=True):
         if self.is_empty():
-            raise RedisDetailQueueEmpty("No proxies available for queue id %s" % self.queue_id)
+            raise RedisDetailQueueEmpty("No proxies available for queue key %s" % self.queue_key)
         detail = Detail(**self.redis.hgetall(self.redis.lpop(self.redis_key)))
         if requeue:
             self.enqueue(detail)
@@ -433,10 +445,7 @@ class StorageManager(object):
         new_queue_id = self.redis_mgr.redis.hget(new_queue_key,'queue_id')
         proxy_id = detail.proxy_id
         proxy_key = detail.proxy_key
-        print("new quueue key:" + new_queue_key)
         cloned = Detail(proxy_id=proxy_id,queue_id=new_queue_id,queue_key=new_queue_key, proxy_key=proxy_key)
-        print("cloned detail key")
-        print(cloned.detail_key)
         
         
         new_detail_key = cloned.detail_key
@@ -458,6 +467,9 @@ class StorageManager(object):
         new_queues = [Queue(**self.redis_mgr.redis.hgetall(q)) for q in self.redis_mgr.redis.keys("qt_*")]
         new_proxies = [Proxy(**self.redis_mgr.redis.hgetall(p)) for p in self.redis_mgr.redis.keys("pt_*")]
         new_detail_keys = set(self.redis_mgr.redis.keys('d_qt*') + self.redis_mgr.redis.keys('d_*pt*'))
+        for ndk in new_detail_keys:
+            self.redis_mgr.redis.sadd('new_details', ndk)
+        
         new_details = [Detail(**self.redis_mgr.redis.hgetall(d)) for d in list(new_detail_keys)]
 
         cursor = self.db_mgr.cursor()
@@ -481,9 +493,17 @@ class StorageManager(object):
                 d.queue_id = queue_keys_to_id[d.queue_key]
             self.db_mgr.insert_detail(d,cursor)
             
-        changed_detials = [Detail(**self.redis_mgr.redis.hgetall(d)) for d in self.redis_mgr.redis.smembers('changed_details')]
+        changed_details = [Detail(**self.redis_mgr.redis.hgetall(d)) for d in self.redis_mgr.redis.sdiff('changed_details','new_details')]
         
+        for changed in changed_details:
+            if(changed.queue_id is None or changed.proxy_id is None):
+                raise Exception("Unable to get a queue_id or proxy_id for an existing detail")
+            
+            self.db_mgr.update_detail(changed)
+            
         logging.info("synced redis cache to database, resetting cache.")
+        self.redis_mgr.redis.flushall()
+
         cursor.close()
         #self.redis_mgr.redis.flushall()
 

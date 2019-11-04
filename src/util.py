@@ -10,16 +10,10 @@ def parse_domain(url):
 
 def flip_coin(prob):
     mark = prob * 100
-    print("mark is %s" % mark)
     result = random.random() * 100
-    print("result is %s" %result)
 
     if result < mark:
         return True
     return False
-
-def update_blacklist_status(detail):
-    print(detail.blacklisted)
-    embed()
 
     

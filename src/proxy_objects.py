@@ -290,19 +290,27 @@ class ProxyObject(Proxy):
         self.storage_mgr = storage_manager
         self.detail = detail
         self.proxy = self.storage_mgr.redis_mgr.get_proxy(detail.proxy_key)
+        self._dispatch_time = None
+        self._draw_queue = None
 
         super().__init__(self.proxy.address, self.proxy.port,
                          self.proxy.protocol, self.proxy.proxy_id)
 
-    def dispatch(self):
-        self.dispatch_time = datetime.now()
+    def dispatch(self, draw_queue):
+        self._dispatch_time = datetime.now()
+        self._draw_queue = draw_queue
+
 
     def callback(self, success):
+
+        if self._dispatch_time is None or self._draw_queue is None:
+            raise Exception("Proxy not properly dispatched prior to callback.")
+
         self.detail.last_used = datetime.now()
 
         if success:
             load_time_delta = datetime.now() - self.dispatch_time
-            self.detail.load_time = load_time_delta.microseconds/1000
+            self.detail.load_time = int(load_time_delta.microseconds/1000)
             self.detail.active = True
             self.detail.last_active = datetime.now()
             #self.detail.decrement_bad_count()
@@ -321,7 +329,11 @@ class ProxyObject(Proxy):
 
         
         self.storage_mgr.redis_mgr.update_detail(self.detail)
+        self._draw_queue.enqueue(self.detail)
+        self._draw_queue = None
+        self._dispatch_time = None
         logging.info("Saved detail to cache")
+
 
 
 

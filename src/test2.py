@@ -6,10 +6,11 @@ import time
 
 
 pm = ProxyManager()
-proxy = pm.get_proxy(DESIGNATED_ENDPOINT)
-print(proxy.to_dict())
-time.sleep(2)
-proxy.callback(success=True)
-print(proxy.to_dict())
+pm.storage_mgr.redis_mgr.redis.flushall()
+pm = ProxyManager()
+for i in range(500):
+    proxy = pm.get_proxy(DESIGNATED_ENDPOINT)
+    proxy.callback(success=False)
+
 
 pm.storage_mgr.sync_to_db()

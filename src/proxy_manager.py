@@ -49,7 +49,7 @@ class ProxyManager(object):
         detail = draw_queue.dequeue(requeue=False)
         proxy = ProxyObject(self.storage_mgr, detail)
 
-        proxy.dispatch()
+        proxy.dispatch(draw_queue)
         return proxy
         
 
