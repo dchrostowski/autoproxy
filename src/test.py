@@ -7,7 +7,7 @@ sm = StorageManager()
 new_proxy = sm.create_proxy('1.1.1.3',8080,'http')
 new_proxy = sm.create_proxy('1.1.1.4',8080,'http')
 new_proxy = sm.create_proxy('1.1.1.5',8080,'http')
-rdq1 = RedisDetailQueue(queue_key='q_1')
+rdq1 = RedisDetailQueue(queue_key='q_1', active=False)
 tq1 = sm.create_queue('https://www.google.com')
 tq2 = sm.create_queue('https://www.bing.com')
 

@@ -12,6 +12,9 @@ BOOLEAN_VALS = (True,'1',False,'0')
 QUEUE_PREFIX = configuration.app_config['redis_queue_char']['value']
 PROXY_PREFIX = configuration.app_config['redis_proxy_char']['value']
 DETAIL_PREFIX = configuration.app_config['redis_detail_char']['value']
+BLACKLIST_THRESHOLD = configuration.app_config['blacklist_threshold']['value']
+DECREMENT_BLACKLIST = configuration.app_config['decrement_blacklist']['value']
+
 class Proxy(object):
     AVAILABLE_PROTOCOLS = ('http', 'https', 'socks5', 'socks4')
 
@@ -85,11 +88,11 @@ class Detail(object):
         self.load_time = load_time
         self._last_active = self.parse_timestamp(last_active)
         self._last_used = self.parse_timestamp(last_used)
-        self.bad_count = bad_count
+        self.bad_count = int(bad_count)
         self.blacklisted = blacklisted
-        self.blacklisted_count = blacklisted_count
-        self.lifetime_good = lifetime_good
-        self.lifetime_bad = lifetime_bad
+        self.blacklisted_count = int(blacklisted_count)
+        self.lifetime_good = int(lifetime_good)
+        self.lifetime_bad = int(lifetime_bad)
         
         self.proxy_id = self.proxy_object_id(proxy_id)
         self.queue_id = self.proxy_object_id(queue_id)
@@ -99,7 +102,6 @@ class Detail(object):
         ifn = lambda x: int(x) if x is not None else None
         self.detail_id = ifn(detail_id)
 
-        self.calling_class = None
     
     @property
     def proxy_key(self):
@@ -215,6 +217,26 @@ class Detail(object):
             obj_dict.update({'queue_id': self.queue_id})
         return obj_dict
 
+    def decrement_bad_count(self):
+        if self.bad_count > 0:
+            self.bad_count -= 1
+            self.decrement_blacklisted_count()
+    
+    def increment_bad_count(self):
+        self.bad_count += 1
+        self.lifetime_bad += 1
+        if self.bad_count > BLACKLIST_THRESHOLD:
+            self.blacklisted = True
+            self.blacklisted_count += 1
+            self.bad_count = 0
+
+    def decrement_blacklist_count(self):
+        if DECREMENT_BLACKLIST and self.blacklisted_count > 0:
+            self.blacklisted_count -= 1
+
+    
+    
+
 
 class Queue(object):
     def __init__(self, domain, queue_id=None, queue_key=None):
@@ -249,24 +271,38 @@ class Queue(object):
 
 
 class ProxyObject(Proxy):
-    def __init__(self, proxy, queue, detail):
-        if detail.proxy_id != proxy.proxy_id:
-            raise Exception("Detail/Proxy mismatch on proxy id")
-        if detail.queue_id != queue.queue_id:
-            raise Exception("Detail/Queue mismatch on queue id")
-
-        self.proxy = proxy
-        self.queue = queue
+    def __init__(self, storage_manager, detail):
+        self.storage_mgr = storage_manager
         self.detail = detail
-
-        self.dispatch_time = None
+        self.proxy = self.storage_mgr.redis_mgr.get_proxy(detail.proxy_key)
 
         super().__init__(self.proxy.address, self.proxy.port,
-                         self.proxy.protocol, self.proxy.id)
+                         self.proxy.protocol, self.proxy.proxy_id)
 
     def dispatch(self):
         self.dispatch_time = datetime.now()
 
     def callback(self, success):
-        self.detail.load_time = datetime.now() - self.dispatch_time
-        self.dispatch_time = None
+        self.detail.last_used = datetime.now()
+
+        if success:
+            load_time_delta = datetime.now() - self.dispatch_time
+            self.detail.load_time = load_time_delta.microseconds
+            self.detail.active = True
+            self.detail.last_active = datetime.now()
+            self.detail.decrement_bad_count()
+            self.detail.lifetime_good += 1
+        else:
+            self.detail.increment_bad_count()
+
+        
+        self.storage_mgr.redis_mgr.update_detail(self.detail)
+        print("saved detail (key:%s)" % self.detail.detail_key )
+
+
+
+    def to_dict(self):
+        return self.detail.to_dict()
+            
+
+        

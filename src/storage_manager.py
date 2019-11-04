@@ -131,8 +131,6 @@ class PostgresManager(object):
         return active + inactive
 
 
-
-
     def init_seed_queues(self):
         logging.info("Initializing queues...")
         if(SEED_QUEUE_ID == AGGREGATE_QUEUE_ID):
@@ -200,10 +198,13 @@ class RedisDetailQueueInvalid(Exception):
     pass
 
 class RedisDetailQueue(object):
-    def __init__(self,queue_key):
+    def __init__(self,queue_key,active=True):
         self.redis = Redis(**configuration.redis_config)
         self.queue_key = queue_key
-        self.redis_key = 'redis_detail_queue_%s' % queue_key
+        active_clause = "active"
+        if not active:
+            active_clause = "inactive"
+        self.redis_key = 'redis_%s_detail_queue_%s' % (active_clause, queue_key)
     
     def is_empty(self):
         if not self.redis.exists(self.redis_key):
@@ -261,7 +262,6 @@ class RedisManager(object):
         self.redis.set("%s_%s" % (TEMP_ID_COUNTER, QUEUE_PREFIX),0)
         self.redis.set("%s_%s" % (TEMP_ID_COUNTER, PROXY_PREFIX),0)
         self.redis.set("%s_%s" % (TEMP_ID_COUNTER, DETAIL_PREFIX),0)
-        self.redis.delete('detail_ids')
 
         queues = self.dbh.get_queues()
         for q in queues:
@@ -291,6 +291,7 @@ class RedisManager(object):
         self.redis.hmset(redis_key,obj.to_dict())
         return redis_key
 
+    @block_if_syncing
     def register_queue(self,queue):
         logging.info("registering queue")
         queue_key = self.register_object(QUEUE_PREFIX,queue)
@@ -298,6 +299,7 @@ class RedisManager(object):
         
         return Queue(**self.redis.hgetall(queue_key))
 
+    @block_if_syncing
     def register_proxy(self,proxy):
         logging.info("registering proxy")
         proxy_key = self.register_object(PROXY_PREFIX,proxy)
@@ -311,7 +313,6 @@ class RedisManager(object):
         logging.info("registering detail")
         
         if detail.proxy_key is None or detail.queue_key is None:
-            rdq1 = RedisDetailQueue(queue_key='q_1')
             raise Exception('detail object must have a proxy and queue key')
         if not self.redis.exists(detail.proxy_key) or not self.redis.exists(detail.queue_key):
             raise Exception("Unable to locate queue or proxy for detail")
@@ -326,8 +327,13 @@ class RedisManager(object):
         
         relational_keys = {'proxy_key': detail.proxy_key, 'queue_key': detail.queue_key}
         self.redis.hmset(detail_key, relational_keys)
-        rdq = RedisDetailQueue(detail.queue_key)
-        rdq.enqueue(detail)
+        active_rdq = RedisDetailQueue(detail.queue_key,active=True)
+        inactive_rdq = RedisDetailQueue(detail.queue_key,active=False)
+
+        if detail.active:
+            active_rdq.enqueue(detail)
+        else:
+            inactive_rdq.enqueue(detail)
 
         return Detail(**self.redis.hgetall(detail_key))
 
@@ -339,9 +345,19 @@ class RedisManager(object):
     def get_all_queues(self):
         return [Queue(**self.redis.hgetall(q)) for q in self.redis.keys('q*')]
 
-    @block_if_syncing
-    def get_all_temp_id_queues(self):
-        return [Queue(**self.redis.hgetall(q)) for q in self.redis.keys("qt*")]
+    def get_queue_by_domain(self,domain):
+        queue_dict = {q.domain: q for q in self.get_all_queues()}
+        if domain in queue_dict:
+            return queue_dict[domain]
+        
+        return self.register_queue(Queue(domain=domain))
+
+    def get_proxy(self,proxy_key):
+        return Proxy(**self.redis.hgetall(proxy_key))
+
+    def update_detail(self,detail):
+        self.redis.hmset(detail.detail_key,detail.to_dict())
+        self.redis.sadd('changed_details',detail.detail_key)
 
 
 class StorageManager(object):
@@ -436,8 +452,11 @@ class StorageManager(object):
                 d.queue_id = queue_keys_to_id[d.queue_key]
             self.db_mgr.insert_detail(d,cursor)
             
-        cursor.close()
+        
         logging.info("synced redis cache to database, resetting cache.")
+
+        changed_detials = [Detail(**self.redis_mgr.redis.hgetall(d)) for d in self.redis_mgr.redis.smembers('changed_details')]
+        cursor.close()
         self.redis_mgr.redis.flushall()
 
         

@@ -44,7 +44,12 @@
         "description": "Percent/probability for when to use a new seed proxy"
     },
 
-    "inactive": {
+    "min_active": {
+        "value": 20,
+        "description": "minimum active queue count before drawing from active queue"
+    },
+
+    "inactive_pct": {
         "value": 0.05,
         "description": "Percent/probability for when to use an unblacklisted, inactive proxy (sum of this and seed_frequency should not exceed 1)"
     },
