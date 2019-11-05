@@ -291,25 +291,29 @@ class ProxyObject(Proxy):
         self.detail = detail
         self.proxy = self.storage_mgr.redis_mgr.get_proxy(detail.proxy_key)
         self._dispatch_time = None
-        self._draw_queue = None
+        self._active_queue = None
+        self._inactive_queue = None
 
         super().__init__(self.proxy.address, self.proxy.port,
                          self.proxy.protocol, self.proxy.proxy_id)
 
-    def dispatch(self, draw_queue):
+    def dispatch(self, active_queue,inactive_queue):
         self._dispatch_time = datetime.now()
-        self._draw_queue = draw_queue
+        self._active_queue = active_queue
+        self._inactive_queue = inactive_queue
 
 
     def callback(self, success):
 
-        if self._dispatch_time is None or self._draw_queue is None:
+        if self._dispatch_time is None or self._active_queue is None or self._inactive_queue is None:
             raise Exception("Proxy not properly dispatched prior to callback.")
 
         self.detail.last_used = datetime.now()
+        return_queue = None
 
         if success:
-            load_time_delta = datetime.now() - self.dispatch_time
+            return_queue = self._active_queue
+            load_time_delta = datetime.now() - self._dispatch_time
             self.detail.load_time = int(load_time_delta.microseconds/1000)
             self.detail.active = True
             self.detail.last_active = datetime.now()
@@ -317,7 +321,9 @@ class ProxyObject(Proxy):
             self.detail.lifetime_good += 1
             if DECREMENT_BLACKLIST:
                 self.detail.blacklisted_count -= 1
+            
         else:
+            return_queue = self._inactive_queue
             self.detail.bad_count += 1
             self.detail.lifetime_bad += 1
             if self.detail.bad_count > BLACKLIST_THRESHOLD:
@@ -325,12 +331,14 @@ class ProxyObject(Proxy):
                 self.detail.blacklisted = True
                 self.detail.active = False
                 self.detail.blacklisted_count += 1
+            
 
 
         
         self.storage_mgr.redis_mgr.update_detail(self.detail)
-        self._draw_queue.enqueue(self.detail)
-        self._draw_queue = None
+        return_queue.enqueue(self.detail)
+        self._active_queue = None
+        self._inactive_queue = None
         self._dispatch_time = None
         logging.info("Saved detail to cache")
 

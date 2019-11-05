@@ -76,7 +76,11 @@ class PostgresManager(object):
     def update_detail(self,obj,cursor=None):
         table_name = sql.Identifier('details')
         obj_dict = obj.to_dict()
+        if 'detail_id' not in obj_dict:
+            raise Exception("attempting to update a detail wtihout a detail id")
+            
         del obj_dict['detail_id']
+
         where_sql = sql.SQL("{0}={1}").format(sql.Identifier('detail_id'),sql.Placeholder('detail_id'))        
         set_sql = sql.SQL(', ').join([sql.SQL("{0}={1}").format(sql.Identifier(k),sql.Placeholder(k)) for k in obj_dict.keys()])
         update = sql.SQL('UPDATE {0} SET {1} WHERE {2}').format(table_name,set_sql,where_sql)
@@ -147,6 +151,36 @@ class PostgresManager(object):
         
         return active + inactive
 
+    # TO DO
+    def get_non_seed_details(self):
+        query= """
+            SELECT * FROM details 
+            WHERE queue_id != %(seed_queue_id)s
+            AND queue_id != %(agg_queue_id)s
+            AND active=%(active)s
+            ORDER BY last_used ASC
+            LIMIT %(limit)s;
+            """
+        
+        active_params = { 
+            'seed_queue_id': SEED_QUEUE_ID,
+            'agg_queue_id': AGGREGATE_QUEUE_ID,
+            'active': True,
+            'limit': ACTIVE_LIMIT
+        }
+
+        inactive_params = {
+            'seed_queue_id': SEED_QUEUE_ID,
+            'agg_queue_id': AGGREGATE_QUEUE_ID,
+            'active': False,
+            'limit': INACTIVE_LIMIT
+        }
+
+        active = [Detail(**d) for d in self.do_query(query, active_params)]
+        inactive = [Detail(**d) for d in self.do_query(query, inactive_params)]
+
+        return active + inactive
+        
 
     def init_seed_queues(self):
         logging.info("Initializing queues...")
@@ -312,6 +346,12 @@ class RedisManager(object):
         for d in seed_details:
             #d.queue_key = "%s_%s" % (QUEUE_PREFIX,SEED_QUEUE_ID)
             #d.proxy_key = "%s_%s" % (PROXY_PREFIX,PROXY_QUEUE_ID
+            self.register_detail(d)
+
+        # TO DO
+        other_details = self.dbh.get_non_seed_details()
+
+        for d in other_details:
             self.register_detail(d)
     
     @block_if_syncing
@@ -492,7 +532,9 @@ class StorageManager(object):
             if d.queue_id is None:
                 d.queue_id = queue_keys_to_id[d.queue_key]
             self.db_mgr.insert_detail(d,cursor)
-            
+        
+
+        changed_detail_keys = self.redis_mgr.redis.sdiff('changed_details','new_details')      
         changed_details = [Detail(**self.redis_mgr.redis.hgetall(d)) for d in self.redis_mgr.redis.sdiff('changed_details','new_details')]
         
         for changed in changed_details:
@@ -502,10 +544,10 @@ class StorageManager(object):
             self.db_mgr.update_detail(changed)
             
         logging.info("synced redis cache to database, resetting cache.")
-        self.redis_mgr.redis.flushall()
 
         cursor.close()
-        #self.redis_mgr.redis.flushall()
+        
+        self.redis_mgr.redis.flushall()
 
         
 
