@@ -100,16 +100,9 @@ class ProxyManager(object):
             draw_queue = rdq_inactive
         
         detail = None
-
-        print("queue length: %s" % rdq_inactive.length())
-        try:
-            detail = draw_queue.dequeue(requeue=False)
-        except Exception as e:
-            embed()
-            raise(e)
-
+        
+        detail = draw_queue.dequeue(requeue=False)
         proxy = ProxyObject(self.storage_mgr, detail)
-
         proxy.dispatch(rdq_active,rdq_inactive)
         return proxy
         

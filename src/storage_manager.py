@@ -152,8 +152,35 @@ class PostgresManager(object):
         return active + inactive
 
     # TO DO
-    def get_details_by_queue_id(self,queues):
-        pass
+    def get_non_seed_details(self):
+        query= """
+            SELECT * FROM details 
+            WHERE queue_id != %(seed_queue_id)s
+            AND queue_id != %(agg_queue_id)s
+            AND active=%(active)s
+            ORDER BY last_used ASC
+            LIMIT %(limit)s;
+            """
+        
+        active_params = { 
+            'seed_queue_id': SEED_QUEUE_ID,
+            'agg_queue_id': AGGREGATE_QUEUE_ID,
+            'active': True,
+            'limit': ACTIVE_LIMIT
+        }
+
+        inactive_params = {
+            'seed_queue_id': SEED_QUEUE_ID,
+            'agg_queue_id': AGGREGATE_QUEUE_ID,
+            'active': False,
+            'limit': INACTIVE_LIMIT
+        }
+
+        active = [Detail(**d) for d in self.do_query(query, active_params)]
+        inactive = [Detail(**d) for d in self.do_query(query, inactive_params)]
+
+        return active + inactive
+        
 
     def init_seed_queues(self):
         logging.info("Initializing queues...")
@@ -321,14 +348,11 @@ class RedisManager(object):
             #d.proxy_key = "%s_%s" % (PROXY_PREFIX,PROXY_QUEUE_ID
             self.register_detail(d)
 
-        non_seed_queue_ids = []
-        for q in queues:
-            if int(q.id) == SEED_QUEUE_ID or int(q.id) == AGGREGATE_QUEUE_ID:
-                next
-            else:
-                non_seed_queue_ids.append(q.id)
         # TO DO
-        #other_details = self.dbh.get_details_by_queue_id(non_seed_queue_ids)
+        other_details = self.dbh.get_non_seed_details()
+
+        for d in other_details:
+            self.register_detail(d)
     
     @block_if_syncing
     def register_object(self,key,obj):
@@ -493,8 +517,6 @@ class StorageManager(object):
         queue_keys_to_id = {}
         proxy_keys_to_id = {}
         for q in new_queues:
-            print("q.queue_key?")
-            embed()
             self.db_mgr.insert_queue(q,cursor)
             queue_id = cursor.fetchone()[0]
             queue_keys_to_id[q.queue_key] = queue_id
@@ -505,31 +527,27 @@ class StorageManager(object):
             proxy_keys_to_id[p.proxy_key] = proxy_id
 
         for d in new_details:
-            print("before: %s" % d.detail_key)
             if d.proxy_id is None:
                 d.proxy_id = proxy_keys_to_id[d.proxy_key]
             if d.queue_id is None:
                 d.queue_id = queue_keys_to_id[d.queue_key]
             self.db_mgr.insert_detail(d,cursor)
-            print("after: %s" % d.detail_key)
-
         
 
         changed_detail_keys = self.redis_mgr.redis.sdiff('changed_details','new_details')      
         changed_details = [Detail(**self.redis_mgr.redis.hgetall(d)) for d in self.redis_mgr.redis.sdiff('changed_details','new_details')]
         
         for changed in changed_details:
-
             if(changed.queue_id is None or changed.proxy_id is None):
                 raise Exception("Unable to get a queue_id or proxy_id for an existing detail")
             
             self.db_mgr.update_detail(changed)
             
         logging.info("synced redis cache to database, resetting cache.")
-        self.redis_mgr.redis.flushall()
 
         cursor.close()
-        #self.redis_mgr.redis.flushall()
+        
+        self.redis_mgr.redis.flushall()
 
         
 
