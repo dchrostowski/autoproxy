@@ -76,7 +76,11 @@ class PostgresManager(object):
     def update_detail(self,obj,cursor=None):
         table_name = sql.Identifier('details')
         obj_dict = obj.to_dict()
+        if 'detail_id' not in obj_dict:
+            raise Exception("attempting to update a detail wtihout a detail id")
+            
         del obj_dict['detail_id']
+
         where_sql = sql.SQL("{0}={1}").format(sql.Identifier('detail_id'),sql.Placeholder('detail_id'))        
         set_sql = sql.SQL(', ').join([sql.SQL("{0}={1}").format(sql.Identifier(k),sql.Placeholder(k)) for k in obj_dict.keys()])
         update = sql.SQL('UPDATE {0} SET {1} WHERE {2}').format(table_name,set_sql,where_sql)
@@ -147,6 +151,8 @@ class PostgresManager(object):
         
         return active + inactive
 
+    def get_details_by_queue_id(self,queues):
+        pass
 
     def init_seed_queues(self):
         logging.info("Initializing queues...")
@@ -313,6 +319,15 @@ class RedisManager(object):
             #d.queue_key = "%s_%s" % (QUEUE_PREFIX,SEED_QUEUE_ID)
             #d.proxy_key = "%s_%s" % (PROXY_PREFIX,PROXY_QUEUE_ID
             self.register_detail(d)
+
+        non_seed_queue_ids = []
+        for q in queues:
+            if int(q.id) == SEED_QUEUE_ID or int(q.id) == AGGREGATE_QUEUE_ID:
+                next
+            else:
+                non_seed_queue_ids.append(q.id)
+
+        other_details = self.dbh.get_details_by_queue_id(non_seed_queue_ids)
     
     @block_if_syncing
     def register_object(self,key,obj):
@@ -477,6 +492,8 @@ class StorageManager(object):
         queue_keys_to_id = {}
         proxy_keys_to_id = {}
         for q in new_queues:
+            print("q.queue_key?")
+            embed()
             self.db_mgr.insert_queue(q,cursor)
             queue_id = cursor.fetchone()[0]
             queue_keys_to_id[q.queue_key] = queue_id
@@ -487,15 +504,21 @@ class StorageManager(object):
             proxy_keys_to_id[p.proxy_key] = proxy_id
 
         for d in new_details:
+            print("before: %s" % d.detail_key)
             if d.proxy_id is None:
                 d.proxy_id = proxy_keys_to_id[d.proxy_key]
             if d.queue_id is None:
                 d.queue_id = queue_keys_to_id[d.queue_key]
             self.db_mgr.insert_detail(d,cursor)
-            
+            print("after: %s" % d.detail_key)
+
+        
+
+        changed_detail_keys = self.redis_mgr.redis.sdiff('changed_details','new_details')      
         changed_details = [Detail(**self.redis_mgr.redis.hgetall(d)) for d in self.redis_mgr.redis.sdiff('changed_details','new_details')]
         
         for changed in changed_details:
+
             if(changed.queue_id is None or changed.proxy_id is None):
                 raise Exception("Unable to get a queue_id or proxy_id for an existing detail")
             

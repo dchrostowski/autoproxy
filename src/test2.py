@@ -6,11 +6,12 @@ import time
 
 
 pm = ProxyManager()
-pm.storage_mgr.redis_mgr.redis.flushall()
-pm = ProxyManager()
 for i in range(500):
     proxy = pm.get_proxy(DESIGNATED_ENDPOINT)
     proxy.callback(success=False)
+    proxy = pm.get_proxy('https://google.com')
+    proxy.callback(success=True)
+
 
 
 pm.storage_mgr.sync_to_db()
