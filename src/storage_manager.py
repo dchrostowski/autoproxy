@@ -151,6 +151,7 @@ class PostgresManager(object):
         
         return active + inactive
 
+    # TO DO
     def get_details_by_queue_id(self,queues):
         pass
 
@@ -326,8 +327,8 @@ class RedisManager(object):
                 next
             else:
                 non_seed_queue_ids.append(q.id)
-
-        other_details = self.dbh.get_details_by_queue_id(non_seed_queue_ids)
+        # TO DO
+        #other_details = self.dbh.get_details_by_queue_id(non_seed_queue_ids)
     
     @block_if_syncing
     def register_object(self,key,obj):
