@@ -308,6 +308,12 @@ class ProxyObject(Proxy):
         if self._dispatch_time is None or self._active_queue is None or self._inactive_queue is None:
             raise Exception("Proxy not properly dispatched prior to callback.")
 
+        if success is None:
+            if self.detail.active:
+                self._active_queue.enqueue(self.detail)
+            else:
+                self._inactive_queue.enqueue(self.detail)
+
         self.detail.last_used = datetime.now()
         return_queue = None
 

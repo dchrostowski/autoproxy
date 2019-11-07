@@ -94,9 +94,11 @@ class ProxyManager(object):
         
         
         if use_active and rdq_active.length() > 0:
+            logging.info("using active queue")
             draw_queue = rdq_active
         
         else:
+            logging.info("using inactive queue")
             draw_queue = rdq_inactive
         
         detail = None
