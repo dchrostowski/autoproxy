@@ -5,7 +5,7 @@ import redis
 #from storage_manager import cache
 from flask import Flask
 
-
+print("here")
 
 app = Flask(__name__)
 
