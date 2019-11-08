@@ -11,19 +11,24 @@ RUN apt-get update && \
 		zlib1g-dev && \
 	apt-get clean && \
 	rm -rf /var/cache/apt/archives/* /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
+RUN pip3 install --upgrade pip
 RUN python3 -m pip install --upgrade \
 		setuptools \
 		wheel && \
 	python3 -m pip install --upgrade scrapy
-WORKDIR /code
-ENV FLASK_APP src/app.py
-ENV FLASK_RUN_HOST 0.0.0.0
-ENV PYTHONPATH=$PYTHONPATH:/code
+
 #RUN apt-get install gcc musl-dev linux-headers postgresql-dev gcc python3-dev musl-dev
 COPY requirements.txt requirements.txt
 RUN pip3 install -r requirements.txt
 #RUN pip3 install -r requirements.txt
 COPY . .
+ENV PYTHONPATH=/code/src:/code:$PYTHONPATH
+
+WORKDIR /code/autoproxy/autoproxy/spiders
+CMD ["scrapy", "runspider", "streetscrape.py"]
+#CMD ["scrapy", "runspider", "autoproxy/autoproxy/spiders/streetscrape.py"]
+WORKDIR /code
+ENV FLASK_APP src/app.py
+ENV FLASK_RUN_HOST 0.0.0.0
 CMD ["python3", "src/app.py"]
 CMD ["flask", "run"]
