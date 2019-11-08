@@ -17,18 +17,19 @@ RUN python3 -m pip install --upgrade \
 		wheel && \
 	python3 -m pip install --upgrade scrapy
 
-#RUN apt-get install gcc musl-dev linux-headers postgresql-dev gcc python3-dev musl-dev
 COPY requirements.txt requirements.txt
+#RUN pip3 --proxy=proxy-fg1.bcbsmn.com:9119 --trusted-host pypi.python.org --trusted-host pypi.org --trusted-host files.pythonhosted.org install -r requirements.txt
 RUN pip3 install -r requirements.txt
-#RUN pip3 install -r requirements.txt
-COPY . .
-ENV PYTHONPATH=/code/src:/code:$PYTHONPATH
 
-WORKDIR /code/autoproxy/autoproxy/spiders
-CMD ["scrapy", "runspider", "streetscrape.py"]
-#CMD ["scrapy", "runspider", "autoproxy/autoproxy/spiders/streetscrape.py"]
+RUN mkdir /code
+#RUN pip3 install -r requirements.txt
 WORKDIR /code
+COPY . .
+ENV PYTHONPATH=/code:$PYTHONPATH
+
 ENV FLASK_APP src/app.py
 ENV FLASK_RUN_HOST 0.0.0.0
 CMD ["python3", "src/app.py"]
 CMD ["flask", "run"]
+#CMD ["scrapy", "runspider", "autoproxy/autoproxy/spiders/streetscrape.py"]
+#CMD ['python3']
