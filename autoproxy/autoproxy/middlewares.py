@@ -11,7 +11,6 @@ from proxy_manager import ProxyManager
 
 proxy_mgr = ProxyManager()
 print("proxy_mgr start")
-embed()
 
 class AutoproxySpiderMiddleware(object):
     # Not all methods need to be defined. If a method is not defined,
@@ -97,7 +96,7 @@ class AutoproxyDownloaderMiddleware(object):
         # - return a Request object
         # - or raise IgnoreRequest
         print("PROCESS RESPONSE")
-        proxy = request['proxy_obj']
+        proxy = request.meta['proxy_obj']
         proxy.callback(success=True)
         return response
 
@@ -110,7 +109,7 @@ class AutoproxyDownloaderMiddleware(object):
         # - return a Response object: stops process_exception() chain
         # - return a Request object: stops process_exception() chain
         print("PROCESS EXCEPTION")
-        proxy = request['proxy_obj']
+        proxy = request.meta['proxy_obj']
         proxy.callback(success=False)
 
     def spider_opened(self, spider):

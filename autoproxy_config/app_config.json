@@ -50,7 +50,7 @@
     },
 
     "inactive_pct": {
-        "value": 0.05,
+        "value": 0.35,
         "description": "Percent/probability for when to use an unblacklisted, inactive proxy (sum of this and seed_frequency should not exceed 1)"
     },
 
