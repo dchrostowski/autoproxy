@@ -301,7 +301,14 @@ class ProxyObject(Proxy):
         self._dispatch_time = datetime.now()
         self._active_queue = active_queue
         self._inactive_queue = inactive_queue
-
+        logging.info("proxy stats:")
+        logging.info("----------------------------------------------")
+        logging.info("proxy address/port: %s" % self.proxy.urlify())
+        logging.info("successful requests: %s" % self.detail.lifetime_good)
+        logging.info("unsuccessful requests: %s" % self.detail.lifetime_bad)
+        logging.info("last active: %s" % self.detail.last_active)
+        logging.info("last used: %s" % self.detail.last_used)
+        logging.info("----------------------------------------------")
 
     def callback(self, success):
 
@@ -342,11 +349,14 @@ class ProxyObject(Proxy):
 
         
         self.storage_mgr.redis_mgr.update_detail(self.detail)
+        logging.info("Saved detail to cache")
+        
+
+
         return_queue.enqueue(self.detail)
         self._active_queue = None
         self._inactive_queue = None
         self._dispatch_time = None
-        logging.info("Saved detail to cache")
 
 
 
