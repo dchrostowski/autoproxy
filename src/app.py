@@ -35,7 +35,7 @@ def runspider():
     def inner():
         proc = subprocess.Popen(cmd,shell=True,stderr=subprocess.PIPE)
         for line in iter(proc.stderr.readline, ''):
-            time.sleep(1)
+            time.sleep(0.1)
             yield str(line.decode('utf-8').rstrip()) + '<br/>\n'
 
     return flask.Response(inner(),mimetype='text/html')
