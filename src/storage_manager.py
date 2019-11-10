@@ -546,8 +546,8 @@ class StorageManager(object):
         logging.info("synced redis cache to database, resetting cache.")
 
         cursor.close()
-        
         self.redis_mgr.redis.flushall()
+        return True
 
         
 

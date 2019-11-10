@@ -11,11 +11,15 @@ class StreetscrapeSpider(scrapy.Spider):
     allowed_domains = ['streetscrape.com']
     start_urls = ['https://api.dev.proxycrawler.com/proxy/test']
 
+    def __init__(self,*args,**kwargs):
+        self.count = int(kwargs.get('count',1))
+
     
     def start_requests(self):
-        request = scrapy.Request(url='https://api.dev.proxycrawler.com/proxy/test', dont_filter=True)
-        logging.info("GET %s" % request.url)
-        yield request
+        for i in range(self.count):
+            request = scrapy.Request(url='https://api.dev.proxycrawler.com/proxy/test', dont_filter=True)
+            logging.info("GET %s" % request.url)
+            yield request
     
 
     def parse(self, response):

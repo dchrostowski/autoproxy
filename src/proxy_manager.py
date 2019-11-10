@@ -77,20 +77,23 @@ class ProxyManager(object):
         rdq_active = RedisDetailQueue(queue_key=queue.queue_key,active=True)
         rdq_inactive = RedisDetailQueue(queue_key=queue.queue_key,active=False)
 
+        logging.info("active queue count: %s" % rdq_active.length())
+        logging.info("inactive queue count: %s" % rdq_inactive.length())
+
         use_active = True
         clone_seed = flip_coin(SEED_FREQUENCY)
 
-        if rdq_inactive.length() < MIN_ACTIVE:
+        if rdq_active.length() < MIN_ACTIVE:
             self.load_from_seed_queue(queue)
 
-        if clone_seed:
+        elif clone_seed:
             self.load_from_seed_queue(queue,num=1)
 
         if rdq_active.length() < MIN_ACTIVE:
             use_active = False
-        else:
-            if flip_coin(INACTIVE_PCT):
-                use_active = False
+        
+        if flip_coin(INACTIVE_PCT):
+            use_active = False
         
         
         if use_active and rdq_active.length() > 0:

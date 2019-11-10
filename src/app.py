@@ -5,6 +5,10 @@ import redis
 #from storage_manager import cache
 import flask
 import subprocess
+from flask import request
+from IPython import embed
+from storage_manager import StorageManager
+
 
 print("here")
 
@@ -31,7 +35,11 @@ def hello():
 
 @app.route('/runspider')
 def runspider():
-    cmd = 'cd /code/autoproxy/autoproxy/spiders && scrapy runspider streetscrape.py'
+    request_args = request.args
+    count = int(request_args.get('count',1))
+    spider = request_args.get('spider','streetscrape')
+
+    cmd = 'cd /code/autoproxy/autoproxy/spiders && scrapy runspider %s.py -a count=%s' % (spider, count)
     def inner():
         proc = subprocess.Popen(cmd,shell=True,stderr=subprocess.PIPE)
         for line in iter(proc.stderr.readline, ''):
@@ -41,5 +49,17 @@ def runspider():
     return flask.Response(inner(),mimetype='text/html')
     
     #call =  subprocess.call('cd /code/autoproxy/autoproxy/spiders && scrapy runspider streetscrape.py', shell=True)
-    return 'hi'
 
+@app.route('/sync_to_db')
+def sync_to_db():
+    storage_mgr = StorageManager()
+    sync_success = storage_mgr.sync_to_db()
+    return {'sync success': sync_success}
+
+@app.route('/sync_from_db')
+def sync_from_db():
+    storage_mgr = StorageManager()
+    storage_mgr.redis_mgr.redis.flushall()
+    storage_mgr = StorageManager()
+    sync_success = not storage_mgr.redis_mgr.redis.exists('syncing')
+    return {'sync success': sync_success}
