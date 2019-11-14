@@ -83,7 +83,7 @@ class ProxyManager(object):
         use_active = True
         clone_seed = flip_coin(SEED_FREQUENCY)
 
-        if rdq_active.length() < MIN_ACTIVE:
+        if rdq_active.length() + rdq_inactive.length() < MIN_ACTIVE:
             self.load_from_seed_queue(queue)
 
         elif clone_seed:

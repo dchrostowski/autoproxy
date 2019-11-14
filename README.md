@@ -21,7 +21,7 @@ cd autoproxy
 docker-compose build
 docker-compose up
 ```
-Open a browser and go to `http://localhost:5000/runspider`
+Open a browser and go to `http://localhost:5000/runspider?spider=gatherproxy&count=1`
 
 This will run a spider against my proxy tester API and print out the results on the page.
 
