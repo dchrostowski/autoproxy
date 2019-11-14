@@ -119,9 +119,12 @@ class PostgresManager(object):
         logging.info("initializing seed proxies")
         cursor = self.cursor()
         if seed_count == 0:
-            seed_details = [Detail(proxy_id=p['proxy_id'], queue_id=SEED_QUEUE_ID) for p in self.do_query("SELECT proxy_id FROM proxies")]
-            for sd in seed_details:
-                self.insert_detail(sd,cursor)
+            proxy_ids = [p['proxy_id'] for p in self.do_query("SELECT proxy_id FROM proxies")]
+            for proxy_id in proxy_ids:
+                insert_detail = "INSERT INTO details (proxy_id,queue_id) VALUES (%(proxy_id)s, %(queue_id)s);"
+                params = {'proxy_id': proxy_id, 'queue_id': SEED_QUEUE_ID}
+                cursor.execute(insert_detail,params)
+
         
         query = """
         BEGIN;
@@ -328,6 +331,7 @@ class RedisManager(object):
 
     @block_if_syncing
     def sync_from_db(self):
+        logging.info("Syncing proxy data from database to redis...")
         self.redis.set("%s_%s" % (TEMP_ID_COUNTER, QUEUE_PREFIX),0)
         self.redis.set("%s_%s" % (TEMP_ID_COUNTER, PROXY_PREFIX),0)
         self.redis.set("%s_%s" % (TEMP_ID_COUNTER, DETAIL_PREFIX),0)
@@ -335,24 +339,30 @@ class RedisManager(object):
         queues = self.dbh.get_queues()
         for q in queues:
             self.register_queue(q)
-
+        logging.info("fetching proxies from database...")
         proxies = self.dbh.get_proxies()
+        logging.info("got %s proxies from database." % len(proxies))
+        logging.info("registering proxies...")
         for p in proxies:
             self.register_proxy(p)
+        logging.info("registered proxies.")
         
+        logging.info("fetching seed details from database...")
         seed_details = self.dbh.get_seed_details()
-        logging.info("got details")
+        logging.info("got %s seed details from database." % len(seed_details))
 
+        logging.info("registering seed details...")
         for d in seed_details:
-            #d.queue_key = "%s_%s" % (QUEUE_PREFIX,SEED_QUEUE_ID)
-            #d.proxy_key = "%s_%s" % (PROXY_PREFIX,PROXY_QUEUE_ID
             self.register_detail(d)
-
-        # TO DO
+        logging.info("registered seed details.")
+        logging.info("fetching proxy details from database...")
         other_details = self.dbh.get_non_seed_details()
-
+        logging.info("got %s proxy details from database." % len(other_details))
+        logging.info("registering proxy details...")
         for d in other_details:
             self.register_detail(d)
+        logging.info("registerd proxy details.")
+        logging.info("sync complete.")
     
     @block_if_syncing
     def register_object(self,key,obj):
@@ -368,7 +378,6 @@ class RedisManager(object):
 
     @block_if_syncing
     def register_queue(self,queue):
-        logging.info("registering queue")
         queue_key = self.register_object(QUEUE_PREFIX,queue)
         self.redis.hmset(queue_key, {'queue_key': queue_key})
         
@@ -376,7 +385,6 @@ class RedisManager(object):
 
     @block_if_syncing
     def register_proxy(self,proxy):
-        logging.info("registering proxy")
         proxy_key = self.register_object(PROXY_PREFIX,proxy)
         self.redis.hmset(proxy_key, {'proxy_key': proxy_key})
 
@@ -385,8 +393,6 @@ class RedisManager(object):
     
     @block_if_syncing
     def register_detail(self,detail):
-        logging.info("registering detail")
-        
         if detail.proxy_key is None or detail.queue_key is None:
             raise Exception('detail object must have a proxy and queue key')
         if not self.redis.exists(detail.proxy_key) or not self.redis.exists(detail.queue_key):
