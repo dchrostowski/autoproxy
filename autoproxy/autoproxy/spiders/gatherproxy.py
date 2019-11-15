@@ -5,6 +5,8 @@ import logging
 from IPython import embed
 import re
 import json
+from proxy_objects import Proxy
+from storage_manager import StorageManager
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
@@ -15,6 +17,7 @@ class GatherproxySpider(scrapy.Spider):
 
     def __init__(self,*args,**kwargs):
         self.count = int(kwargs.get('count',1))
+        self.storage_mgr = StorageManager()
 
     def start_requests(self):
         for i in range(self.count):
@@ -24,20 +27,17 @@ class GatherproxySpider(scrapy.Spider):
 
     def make_proxy(self,address,port,location,protocol='http'):
         port = int(port,16)
-        return {
-            'address': address,
-            'port': port,
-            'location': location,
-            'protocol': protocol
-        }
+        proxy = Proxy(address=address,port=port)
+        self.storage_mgr.new_proxy(proxy)
+        return proxy
 
     def log_proxy_info(self,proxy):
         log_str = """
+        scraped proxy:
         ----------------
         ADDRESS: %s
         PORT: %s
-        LOCATION: %s
-        ----------------""" % (proxy['address'],proxy['port'],proxy['location'])
+        ----------------""" % (proxy.address, proxy.port)
         logging.info(log_str)
 
     def parse(self, response):

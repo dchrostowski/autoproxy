@@ -112,3 +112,6 @@ class ProxyManager(object):
         return proxy
         
 
+    def new_proxy(self,proxy):
+        return self.storage_mgr.new_proxy(proxy)
+        

@@ -446,11 +446,27 @@ class RedisManager(object):
         self.redis.hmset(detail.detail_key,detail.to_dict())
         self.redis.sadd('changed_details',detail.detail_key)
 
+    def get_proxy_by_address_and_port(self,address,port):
+        proxy_keys = self.redis.keys('p*')
+        all_proxies = [Proxy(**self.redis.hgetall(pkey)) for pkey in proxy_keys]
+        proxy_dict = {"%s:%s" % (proxy.address,proxy.port): proxy for proxy in all_proxies}
+        search_key = "%s:%s" % (address,port)
+        return proxy_dict.get(search_key,None)
+
 
 class StorageManager(object):
     def __init__(self):
         self.redis_mgr = RedisManager()
         self.db_mgr = PostgresManager()
+
+    def new_proxy(self,proxy):
+        existing = self.redis_mgr.get_proxy_by_address_and_port(proxy.address,proxy.port)
+        if existing is None:
+            logging.info("registering new proxy %s" % proxy.urlify())
+            new_proxy = self.redis_mgr.register_proxy(proxy)
+            new_detail = Detail(proxy_key=new_proxy.proxy_key, queue_id=SEED_QUEUE_ID)
+            self.redis_mgr.register_detail(new_detail)
+
 
     def create_queue(self,url):
         logging.info("creating queue for %s" % url)
