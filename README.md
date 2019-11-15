@@ -14,6 +14,8 @@ After recording sufficient data, it is able to create a database of proxy server
 ### Overview
 When web crawling, proxies are essential for maintaining anonymity and circumventing bot detection.  There are a number of free public proxy servers spread across the Internet, however their performance is inconsistent.  For example, a particular proxy may work for one site but not another when web crawling. This project aims to create a proxy farm that stores performance and reliability statistics for public proxies on a per-site basis.
 
+This project utilizes a redis store to temporarily store and cache proxy server information for use by a scrapy middleware.  This cache is then periodically synced to a Postgres database intended to be a more permanent and practical storage medium for proxy statistics.  After syncing, the redis store is flushed and new proxy servers from the database are rotated into the cache for use again.
+
 ### Example Usage
 
 I'm still working on this, but here's how to run it:
