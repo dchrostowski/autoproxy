@@ -12,15 +12,17 @@ RUN apt-get update && \
 	apt-get clean && \
 	rm -rf /var/cache/apt/archives/* /var/lib/apt/lists/* /tmp/* /var/tmp/*
 RUN pip3 install  --upgrade pip
+
+COPY requirements.txt requirements.txt
+
 RUN python3 -m pip install  --upgrade \
 		setuptools \
 		wheel && \
-	python3 -m pip install  --upgrade scrapy
+		python3 -m pip install -r requirements.txt && \
+		python3 -m pip install  --upgrade scrapy
 
-COPY requirements.txt requirements.txt
+
 #RUN pip3 --proxy=proxy-fg1.bcbsmn.com:9119 --trusted-host pypi.python.org --trusted-host pypi.org --trusted-host files.pythonhosted.org install -r requirements.txt
-RUN pip3 install  -r requirements.txt
-
 RUN mkdir /code
 WORKDIR /code
 COPY . .

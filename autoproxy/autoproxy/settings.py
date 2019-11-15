@@ -55,7 +55,10 @@ DOWNLOAD_TIMEOUT = 22
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
     'autoproxy.middlewares.AutoproxyDownloaderMiddleware': 543,
+    'scrapy_user_agents.middlewares.RandomUserAgentMiddleware': 400
 }
+
+RANDOM_UA_PER_PROXY = True
 
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html
