@@ -24,9 +24,15 @@ class ProxydbSpider(scrapy.Spider):
             yield request
 
     def parse(self, response):
-        trs = response.xpath('//div[@class="table-responsive"]/table[contains(@class, "table-hover")]//tr')
+        tds = response.xpath('//div[@class="table-responsive"]/table[contains(@class,"table-hover")]//tr/td')
+        embed()
         for tr in trs:
-            address_port = tr.xpath('td[1]/a/text()').extract_first()
-            protocol = tr.xpath('td[5]/text()').extract_first()
-            print(address_port)
-            print(protocol)
+            address_port = tr.xpath('./td[1]/a/text()').extract_first()
+            embed()
+            protocol = tr.xpath('./td[5]/text()').extract_first()
+            ap_res = re.search(r'^([\d\.]+)\:(\d+)$', address_port)
+            address = ap_res.group(1)
+            port = int(ap_res.group(2))
+            embed()
+
+            self.storage_mgr.new_proxy(Proxy(address=address, port=port, protocol=protocol))
