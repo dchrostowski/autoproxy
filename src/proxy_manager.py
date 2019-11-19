@@ -32,41 +32,20 @@ class ProxyManager(object):
     def __init__(self):
         self.storage_mgr = StorageManager()
 
-    def load_from_seed_queue(self,queue,num=None):
-        if queue.queue_id == SEED_QUEUE_ID:
-            return
-
+    def load_seeds(self,queue,active=False,num=0):
         seed_queue = self.storage_mgr.redis_mgr.get_queue_by_id(SEED_QUEUE_ID)
-        seed_rdq_active = RedisDetailQueue(queue_key=seed_queue.queue_key,active=True)
-        seed_rdq_inactive = RedisDetailQueue(queue_key=seed_queue.queue_key, active=False)
-
+        seed_rdq = RedisDetailQueue(queue_key=seed_queue.queue_key,active=active)
+        seed_rdq_size = seed_rdq.length()
+        seeds_to_dequeue = 0
+        if num > 0:
+            seeds_to_dequeue = min(num,seed_rdq_size)
+        elif active and num == 0:
+            seeds_to_dequeue = min(ACTIVE_PROXIES_PER_QUEUE,seed_rdq_size)
+        elif not active and num == 0:
+            seeds_to_dequeue = min(INACTIVE_PROXIES_PER_QUEUE, seed_rdq_size)
         
-        active_seeds_to_dequeue = min(ACTIVE_PROXIES_PER_QUEUE,seed_rdq_active.length())
-        inactive_seeds_to_dequeue = INACTIVE_PROXIES_PER_QUEUE - active_seeds_to_dequeue
-
-        if num is not None:
-            active_seeds_to_dequeue = num
-            inactive_seeds_to_dequeue = num
-        
-        for i in range(active_seeds_to_dequeue):
-            try:
-                self.storage_mgr.clone_detail(seed_rdq_active.dequeue(), queue)
-            except Exception as e:
-                pass
-        
-        for i in range(inactive_seeds_to_dequeue):
-            self.storage_mgr.clone_detail(seed_rdq_inactive.dequeue(), queue)
-
-        
-
-
-    def get_seed_proxy(self,queue):
-        if queue.id == SEED_QUEUE_ID:
-            logging.warn("trying to copy seed proxy to seed_queue")
-            return
-
-        seed_queue = self.storage_mgr.redis_mgr.get_queue_by_id(SEED_QUEUE_ID)
-        self.storage_mgr.clone_detail(seed_queue.dequeue(), queue)
+        for i in range(seeds_to_dequeue):
+            self.storage_mgr.clone_detail(seed_rdq.dequeue(), queue)
 
         
         
@@ -83,11 +62,16 @@ class ProxyManager(object):
         use_active = True
         clone_seed = flip_coin(SEED_FREQUENCY)
 
-        if rdq_active.length() + rdq_inactive.length() < MIN_ACTIVE:
-            self.load_from_seed_queue(queue)
+        if rdq_active.length() < ACTIVE_PROXIES_PER_QUEUE:
+            self.load_seeds(queue,active=True)
 
-        elif clone_seed:
-            self.load_from_seed_queue(queue,num=1)
+        if rdq_inactive.length() < INACTIVE_PROXIES_PER_QUEUE:
+            self.load_seeds(queue,active=False)
+
+        if clone_seed:
+            self.load_from_seed_queue(queue, active=True, num=1)
+            self.load_from_seed_queue(queue, active=False, num=1)
+
 
         if rdq_active.length() < MIN_ACTIVE:
             use_active = False
