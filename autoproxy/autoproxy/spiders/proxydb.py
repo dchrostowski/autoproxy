@@ -23,6 +23,11 @@ class ProxydbSpider(scrapy.Spider):
             logging.info("GET %s" % request.url)
             yield request
 
+    def parse(self,response):
+        with open('./proxydb.html','w') as ofh:
+            ofh.write(response.body.decode('utf-8'))
+        
+"""
     def parse(self, response):
         tds = response.xpath('//div[@class="table-responsive"]/table[contains(@class,"table-hover")]//tr/td')
         embed()
@@ -36,3 +41,4 @@ class ProxydbSpider(scrapy.Spider):
             embed()
 
             self.storage_mgr.new_proxy(Proxy(address=address, port=port, protocol=protocol))
+"""
