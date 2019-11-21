@@ -10,7 +10,7 @@ services:
   redis:
     image: "redis:alpine"
     ports:
-      - "6379:6379"
+      - "63790:6379"
     
   db:
 #   Use the Docker Image postgres. This will pull the newest release.
