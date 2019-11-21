@@ -14,7 +14,8 @@ ratob = "var yxy = /* *//* *//* *//* */ atob('\x4d\x7a\x6b\x75\x4d\x54\x67\x3d'.
 
 ctx.eval(js_code)
 addr1 = ctx.eval("a")
-port = ctx.eval("pp")
-addr2 = base64.b64decode(ctx.eval("yxy"))
+port = int(ctx.eval("pp"))
+addr2 = base64.b64decode(ctx.eval("yxy")).decode('utf-8')
+address = "%s%s" % (addr1,addr2)
 
 embed()
