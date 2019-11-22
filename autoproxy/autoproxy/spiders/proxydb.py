@@ -1,12 +1,16 @@
 # -*- coding: utf-8 -*-
 import scrapy
 import sys
+import base64
 import logging
 from IPython import embed
 import re
 from py_mini_racer import py_mini_racer
 from proxy_objects import Proxy
 from storage_manager import StorageManager
+
+ctx = py_mini_racer.MiniRacer()
+ctx.eval(" var atob = (arg) => arg ")
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
@@ -27,15 +31,15 @@ class ProxydbSpider(scrapy.Spider):
 
     def deobfuscate(self,resp):
 
-    proxies = []
-
-    try:
-        ctx.eval("const atob = (arg) => arg")
+        proxies = []
+            
         rnnumt = resp.xpath('//div[@data-rnnumt]/@data-rnnumt').extract_first()
-        ctx.eval("let rnnumt = %s" % rnnumt)
+        embed()
+        ctx.eval("var rnnumt = %s" % rnnumt)
         
         trs = resp.xpath('//div[@class="table-responsive"]/table[contains(@class,"table-hover")]/tbody/tr')
         for tr in trs:
+            ctx.eval("var rnnumt = %s" % rnnumt)
             script = tr.xpath('td[1]/script/text()').extract_first()
             string_to_replace = "(+document.querySelector('[data-rnnumt]').getAttribute('data-rnnumt'))"
             script = script.replace(string_to_replace, " rnnumt ")
@@ -59,12 +63,12 @@ class ProxydbSpider(scrapy.Spider):
             logging.info("successfully deobfuscated proxy:\naddress=%s port=%s protocol=%s" % (address,port, protocol))
             proxies.append({ 'address': address, 'port':port, 'protocol': protocol })
 
-    except Exception as e:
-        logging.warn(e)
 
 
-    return proxies
+        return proxies
 
     def parse(self,response):
-        proxies = deobfuscate(response)
-        
+        with open('./proxydb.html','w') as ofh:
+            ofh.write(response.body_as_unicode())
+        proxies = self.deobfuscate(response)
+

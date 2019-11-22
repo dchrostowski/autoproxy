@@ -513,13 +513,13 @@ class StorageManager(object):
         new_detail_key = cloned.detail_key
 
         if self.redis_mgr.redis.exists(new_detail_key):
-            logging.warn("trying to clone a detail into a queue where it already exists.")
+            #logging.warn("trying to clone a detail into a queue where it already exists.")
             return Detail(**self.redis_mgr.redis.hgetall(new_detail_key))
 
         if new_queue_id is not None and proxy_id is not None:
             db_detail = self.db_mgr.get_detail_by_queue_and_proxy(new_queue_id,proxy_id)
             if db_detail is not None:
-                logging.warn("Attempting to clone a detail that already exists")
+                #logging.warn("Attempting to clone a detail that already exists")
                 return self.redis_mgr.register_detail(db_detail)
 
         return self.redis_mgr.register_detail(cloned)
