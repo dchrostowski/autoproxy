@@ -31,50 +31,45 @@ class ProxydbSpider(scrapy.Spider):
             yield request
 
     def deobfuscate(self,resp):
-
         proxies = []
+        try:
+            trs = resp.xpath('//div[@class="table-responsive"]/table[contains(@class,"table-hover")]/tbody/tr')
             
-        
-        trs = resp.xpath('//div[@class="table-responsive"]/table[contains(@class,"table-hover")]/tbody/tr')
-        
-        for tr in trs:
-            #rnnumt = resp.xpath('//div[@data-rnnumt]/@data-rnnumt').extract_first()
+            for tr in trs
+                script = tr.xpath('td[1]/script/text()').extract_first()
+                rnnum_var_full_search = re.search(r'getAttribute\(\'(data\-(\w+))\'\)',script)
 
-            # need to get a new rnnumt form 
-            #ctx.eval("var rnnumt = %s" % rnnumt)
-            script = tr.xpath('td[1]/script/text()').extract_first()
-            rnnum_var_full_search = re.search(r'getAttribute\(\'(data\-(\w+))\'\)',script)
+                rnnum_var_full = rnnum_var_full_search.group(1)
+                rnnum_var = rnnum_var_full_search.group(2)
+                
+                rnnum = resp.xpath('//div[@%s]/@%s' % (rnnum_var_full,rnnum_var_full)).extract_first()
+                string_to_replace = "(+document.querySelector('[%s]').getAttribute('%s'))" % (rnnum_var_full,rnnum_var_full)
+                
+                ctx.eval(" var %s = %s " % (rnnum_var,rnnum))
 
-            rnnum_var_full = rnnum_var_full_search.group(1)
-            rnnum_var = rnnum_var_full_search.group(2)
-            
-            rnnum = resp.xpath('//div[@%s]/@%s' % (rnnum_var_full,rnnum_var_full)).extract_first()
-            string_to_replace = "(+document.querySelector('[%s]').getAttribute('%s'))" % (rnnum_var_full,rnnum_var_full)
-            
-            ctx.eval(" var %s = %s " % (rnnum_var,rnnum))
+                script = script.replace(string_to_replace, " %s " % rnnum_var)
+                
+                scripts = script.split(';')[0:3]
+                var_re = r'var\s+(\w+)\s*\='
 
-            script = script.replace(string_to_replace, " %s " % rnnum_var)
-            
-            scripts = script.split(';')[0:3]
-            var_re = r'var\s+(\w+)\s*\='
+                addr1_var = re.search(var_re, scripts[0]).group(1)
+                addr2_var = re.search(var_re, scripts[1]).group(1)
+                port_var = re.search(var_re, scripts[2]).group(1)
 
-            addr1_var = re.search(var_re, scripts[0]).group(1)
-            addr2_var = re.search(var_re, scripts[1]).group(1)
-            port_var = re.search(var_re, scripts[2]).group(1)
+                for js in scripts:
+                    ctx.eval(js)
 
-            for js in scripts:
-                ctx.eval(js)
+                addr1 = ctx.eval(addr1_var)
+                addr2 = base64.b64decode(ctx.eval(addr2_var)).decode('utf-8')
+                port = int(ctx.eval(port_var))
 
-            addr1 = ctx.eval(addr1_var)
-            addr2 = base64.b64decode(ctx.eval(addr2_var)).decode('utf-8')
-            port = int(ctx.eval(port_var))
+                address = "%s%s" % (addr1,addr2)
+                protocol = tr.xpath('td[5]/text()').extract_first().strip().lower()
+                logging.info("successfully deobfuscated proxy:\naddress=%s port=%s protocol=%s" % (address,port, protocol))
+                proxies.append({ 'address': address, 'port':port, 'protocol': protocol })
 
-            address = "%s%s" % (addr1,addr2)
-            protocol = tr.xpath('td[5]/text()').extract_first().strip().lower()
-            logging.info("successfully deobfuscated proxy:\naddress=%s port=%s protocol=%s" % (address,port, protocol))
-            proxies.append({ 'address': address, 'port':port, 'protocol': protocol })
-
-
+        except Exception as e:
+            logging.warn(e)
 
         return proxies
 
@@ -82,4 +77,7 @@ class ProxydbSpider(scrapy.Spider):
         with open('./proxydb.html','w') as ofh:
             ofh.write(response.body_as_unicode())
         proxies = self.deobfuscate(response)
+        for pdata in proxies:
+            proxy = Proxy(address=pdata['address'], port=pdata['port'],protocol=pdata['protocol'])
+            self.storage_mgr.new_proxy(proxy)
 
