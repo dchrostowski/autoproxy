@@ -27,22 +27,33 @@ class ProxydbSpider(scrapy.Spider):
         for i in range(self.count):
             request = scrapy.Request(url='http://proxydb.net/', dont_filter=True)
             logging.info("GET %s" % request.url)
+
             yield request
 
     def deobfuscate(self,resp):
 
         proxies = []
             
-        rnnumt = resp.xpath('//div[@data-rnnumt]/@data-rnnumt').extract_first()
-        embed()
-        ctx.eval("var rnnumt = %s" % rnnumt)
         
         trs = resp.xpath('//div[@class="table-responsive"]/table[contains(@class,"table-hover")]/tbody/tr')
+        
         for tr in trs:
-            ctx.eval("var rnnumt = %s" % rnnumt)
+            #rnnumt = resp.xpath('//div[@data-rnnumt]/@data-rnnumt').extract_first()
+
+            # need to get a new rnnumt form 
+            #ctx.eval("var rnnumt = %s" % rnnumt)
             script = tr.xpath('td[1]/script/text()').extract_first()
-            string_to_replace = "(+document.querySelector('[data-rnnumt]').getAttribute('data-rnnumt'))"
-            script = script.replace(string_to_replace, " rnnumt ")
+            rnnum_var_full_search = re.search(r'getAttribute\(\'(data\-(\w+))\'\)',script)
+
+            rnnum_var_full = rnnum_var_full_search.group(1)
+            rnnum_var = rnnum_var_full_search.group(2)
+            
+            rnnum = resp.xpath('//div[@%s]/@%s' % (rnnum_var_full,rnnum_var_full)).extract_first()
+            string_to_replace = "(+document.querySelector('[%s]').getAttribute('%s'))" % (rnnum_var_full,rnnum_var_full)
+            
+            ctx.eval(" var %s = %s " % (rnnum_var,rnnum))
+
+            script = script.replace(string_to_replace, " %s " % rnnum_var)
             
             scripts = script.split(';')[0:3]
             var_re = r'var\s+(\w+)\s*\='
