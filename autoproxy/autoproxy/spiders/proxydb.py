@@ -35,7 +35,7 @@ class ProxydbSpider(scrapy.Spider):
         try:
             trs = resp.xpath('//div[@class="table-responsive"]/table[contains(@class,"table-hover")]/tbody/tr')
             
-            for tr in trs
+            for tr in trs:
                 script = tr.xpath('td[1]/script/text()').extract_first()
                 rnnum_var_full_search = re.search(r'getAttribute\(\'(data\-(\w+))\'\)',script)
 

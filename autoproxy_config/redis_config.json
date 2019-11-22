@@ -1,4 +1,4 @@
 {
-    "host": "localhost",
-    "port": 5379
+    "host": "redis",
+    "port": 6379
 }
