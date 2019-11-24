@@ -9,6 +9,8 @@
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
+import logging
+
 BOT_NAME = 'autoproxy'
 
 SPIDER_MODULES = ['autoproxy.spiders']
@@ -59,6 +61,8 @@ DOWNLOADER_MIDDLEWARES = {
 }
 
 RANDOM_UA_PER_PROXY = True
+logging.getLogger('scrapy_user_agents.user_agent_picker').setLevel(logging.CRITICAL)
+
 
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html

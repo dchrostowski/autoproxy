@@ -8,9 +8,14 @@
 from scrapy import signals
 from IPython import embed
 from proxy_manager import ProxyManager
+import sys
+import logging
+
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 proxy_mgr = ProxyManager()
-print("proxy_mgr start")
 
 class AutoproxySpiderMiddleware(object):
     # Not all methods need to be defined. If a method is not defined,
@@ -75,8 +80,9 @@ class AutoproxyDownloaderMiddleware(object):
     def process_request(self, request, spider):
         # Called for each request that goes through the downloader
         # middleware.
-        print("PROCESS REQUEST")
+        spider.logger.info("processing request for %s" % request.url)
         proxy = proxy_mgr.get_proxy(request.url)
+        logger.info("using proxy %s" % proxy.urlify())
         request.meta['proxy'] = proxy.urlify()
         request.meta['proxy_obj'] = proxy
 
@@ -95,22 +101,27 @@ class AutoproxyDownloaderMiddleware(object):
         # - return a Response object
         # - return a Request object
         # - or raise IgnoreRequest
-        print("PROCESS RESPONSE")
+        spider.logger.info("processing response for %s" % request.url)
         proxy = request.meta['proxy_obj']
         proxy.callback(success=True)
         return response
 
     def process_exception(self, request, exception, spider):
-        # Called when a download handler or a process_request()
+        # Called when a download handler or a process_request()F
         # (from other downloader middleware) raises an exception.
 
         # Must either:
         # - return None: continue processing this exception
         # - return a Response object: stops process_exception() chain
         # - return a Request object: stops process_exception() chain
-        print("PROCESS EXCEPTION")
-        proxy = request.meta['proxy_obj']
+        spider.logger.info("processing exception for %s" % request.url)
+        proxy = request.meta.get('proxy_obj',None)
+
+        if proxy is None:
+            logger.warn("no proxy object found in request.meta")
+
         proxy.callback(success=False)
+        return None
 
     def spider_opened(self, spider):
         spider.logger.info('Spider opened: %s' % spider.name)

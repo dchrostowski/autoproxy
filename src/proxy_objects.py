@@ -311,20 +311,23 @@ class ProxyObject(Proxy):
         logging.info("----------------------------------------------")
 
     def callback(self, success):
-
         if self._dispatch_time is None or self._active_queue is None or self._inactive_queue is None:
             raise Exception("Proxy not properly dispatched prior to callback.")
 
+        self.detail.last_used = datetime.now()
+        return_queue = None
+
         if success is None:
+            logging.info("proxy callback(success=None)")
             if self.detail.active:
                 self._active_queue.enqueue(self.detail)
             else:
                 self._inactive_queue.enqueue(self.detail)
 
-        self.detail.last_used = datetime.now()
-        return_queue = None
+        
 
-        if success:
+        elif success:
+            logging.info("proxy callback(success=True)")
             return_queue = self._active_queue
             load_time_delta = datetime.now() - self._dispatch_time
             self.detail.load_time = int(load_time_delta.microseconds/1000)
@@ -336,6 +339,7 @@ class ProxyObject(Proxy):
                 self.detail.blacklisted_count -= 1
             
         else:
+            logging.info("proxy callback(success=False)")
             return_queue = self._inactive_queue
             self.detail.bad_count += 1
             self.detail.lifetime_bad += 1

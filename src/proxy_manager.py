@@ -31,6 +31,7 @@ SEED_QUEUE_ID = app_config('seed_queue')
 class ProxyManager(object):
     def __init__(self):
         self.storage_mgr = StorageManager()
+        self.logger = logging.getLogger(__name__)
 
     def load_seeds(self,queue,active=False,num=0):
         seed_queue = self.storage_mgr.redis_mgr.get_queue_by_id(SEED_QUEUE_ID)
@@ -56,8 +57,8 @@ class ProxyManager(object):
         rdq_active = RedisDetailQueue(queue_key=queue.queue_key,active=True)
         rdq_inactive = RedisDetailQueue(queue_key=queue.queue_key,active=False)
 
-        logging.info("active queue count: %s" % rdq_active.length())
-        logging.info("inactive queue count: %s" % rdq_inactive.length())
+        self.logger.info("active queue count: %s" % rdq_active.length())
+        self.logger.info("inactive queue count: %s" % rdq_inactive.length())
 
         use_active = True
         clone_seed = flip_coin(SEED_FREQUENCY)
@@ -69,8 +70,8 @@ class ProxyManager(object):
             self.load_seeds(queue,active=False)
 
         if clone_seed:
-            self.load_from_seed_queue(queue, active=True, num=1)
-            self.load_from_seed_queue(queue, active=False, num=1)
+            self.load_seeds(queue, active=True, num=1)
+            self.load_seeds(queue, active=False, num=1)
 
 
         if rdq_active.length() < MIN_ACTIVE:
@@ -81,11 +82,11 @@ class ProxyManager(object):
         
         
         if use_active and rdq_active.length() > 0:
-            logging.info("using active queue")
+            self.logger.info("using active queue")
             draw_queue = rdq_active
         
         else:
-            logging.info("using inactive queue")
+            self.logger.info("using inactive queue")
             draw_queue = rdq_inactive
         
         detail = None
