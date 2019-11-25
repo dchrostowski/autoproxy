@@ -54,8 +54,14 @@ class ProxyManager(object):
     def get_proxy(self,request_url):
         domain = parse_domain(request_url)
         queue = self.storage_mgr.redis_mgr.get_queue_by_domain(domain)
+        print("getproxy: check queue: %s" % queue)
+        self.logger.info('get proxy for queue key %s' % queue.queue_key)
         rdq_active = RedisDetailQueue(queue_key=queue.queue_key,active=True)
         rdq_inactive = RedisDetailQueue(queue_key=queue.queue_key,active=False)
+
+        print("rdq_active redis key: %s" % rdq_active.redis_key)
+        print("rdq_inactive redis key: %s" % rdq_inactive.redis_key)
+
 
         self.logger.info("active queue count: %s" % rdq_active.length())
         self.logger.info("inactive queue count: %s" % rdq_inactive.length())
@@ -75,9 +81,13 @@ class ProxyManager(object):
 
 
         if rdq_active.length() < MIN_ACTIVE:
-            use_active = False
+            if flip_coin(INACTIVE_PCT):
+                use_active = True
+            else:
+                use_active = False
+            
         
-        if flip_coin(INACTIVE_PCT):
+        elif flip_coin(INACTIVE_PCT):
             use_active = False
         
         
@@ -93,6 +103,11 @@ class ProxyManager(object):
         
         detail = draw_queue.dequeue(requeue=False)
         proxy = ProxyObject(self.storage_mgr, detail)
+        while 'socks' in proxy.protocol:
+            detail = draw_queue.dequeue(requeue=False)
+            proxy = ProxyObject(self.storage_mgr, detail)
+
+
         proxy.dispatch(rdq_active,rdq_inactive)
         return proxy
         

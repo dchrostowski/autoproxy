@@ -74,10 +74,29 @@ class ProxydbSpider(scrapy.Spider):
         return proxies
 
     def parse(self,response):
-        with open('./proxydb.html','w') as ofh:
-            ofh.write(response.body_as_unicode())
         proxies = self.deobfuscate(response)
         for pdata in proxies:
             proxy = Proxy(address=pdata['address'], port=pdata['port'],protocol=pdata['protocol'])
             self.storage_mgr.new_proxy(proxy)
+        
+        proxies_by_dropdown_urls = response.xpath('//div[@aria-labelledby="navbar_dropdown_proxies_by"]/a/@href').extract()
+        for url in proxies_by_dropdown_urls:
+            url = response.urljoin(url)
+            req = scrapy.Request(url=url, callback=self.parse_dropdown, dont_filter=True)
+            yield req
 
+    def parse_dropdown(self,response):
+        links = response.xpath('//table[contains(@class,"table-hover")]/tbody/tr/td[1]/a/@href').extract()
+        for link in links:
+            url = response.urljoin(link)
+            req = scrapy.Request(url=url, callback=self.parse_category_links)
+            yield req
+
+
+
+    def parse_category_links(self,response):
+        print("parsing cat link")
+        proxies = self.deobfuscate(response)
+        for pdata in proxies:
+            proxy = Proxy(address=pdata['address'], port=pdata['port'],protocol=pdata['protocol'])
+            self.storage_mgr.new_proxy(proxy)

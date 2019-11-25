@@ -310,19 +310,24 @@ class ProxyObject(Proxy):
         logging.info("last used: %s" % self.detail.last_used)
         logging.info("----------------------------------------------")
 
-    def callback(self, success):
-        if self._dispatch_time is None or self._active_queue is None or self._inactive_queue is None:
+    def callback(self, success,requeue=True):
+        if self._dispatch_time is None or (requeue and (self._active_queue is None or self._inactive_queue is None)):
             raise Exception("Proxy not properly dispatched prior to callback.")
 
         self.detail.last_used = datetime.now()
         return_queue = None
 
+        print("self._active_queue redis key: %s" % self._active_queue.redis_key)
+        print("self._inactive_queue redis key: %s" % self._inactive_queue.redis_key)
+
         if success is None:
             logging.info("proxy callback(success=None)")
             if self.detail.active:
-                self._active_queue.enqueue(self.detail)
+                if requeue:
+                    self._active_queue.enqueue(self.detail)
             else:
-                self._inactive_queue.enqueue(self.detail)
+                if requeue:
+                    self._inactive_queue.enqueue(self.detail)
 
         
 
@@ -356,8 +361,12 @@ class ProxyObject(Proxy):
         logging.info("Saved detail to cache")
         
 
+        if requeue:
 
-        return_queue.enqueue(self.detail)
+            print('chck return queue')
+            print(return_queue.queue_key)
+            return_queue.enqueue(self.detail)
+
         self._active_queue = None
         self._inactive_queue = None
         self._dispatch_time = None

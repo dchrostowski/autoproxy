@@ -45,7 +45,7 @@
     },
 
     "min_active": {
-        "value": 60,
+        "value": 25,
         "description": "minimum active queue count before drawing from active queue"
     },
 

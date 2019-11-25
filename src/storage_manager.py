@@ -10,6 +10,7 @@ from functools import wraps
 from copy import deepcopy
 from datetime import datetime
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+import traceback
 
 from psycopg2.extras import DictCursor
 from psycopg2 import sql
@@ -76,12 +77,15 @@ class PostgresManager(object):
     def update_detail(self,obj,cursor=None):
         table_name = sql.Identifier('details')
         obj_dict = obj.to_dict()
-        if 'detail_id' not in obj_dict:
-            raise Exception("attempting to update a detail wtihout a detail id")
-            
-        del obj_dict['detail_id']
-
         where_sql = sql.SQL("{0}={1}").format(sql.Identifier('detail_id'),sql.Placeholder('detail_id'))        
+
+        if 'detail_id' not in obj_dict:
+            if 'queue_id' not in obj_dict or 'proxy_id' not in obj_dict:
+                raise Exception("cannot update detail without a detail id, queue id, or proxy id")
+            where_sql = sql.SQL("{0}={1} AND {2}={3}").format(sql.Identifier('queue_id'),sql.Placeholder('queue_id'),sql.Identifier('proxy_id'),sql.Placeholder('proxy_id'))        
+            
+            
+
         set_sql = sql.SQL(', ').join([sql.SQL("{0}={1}").format(sql.Identifier(k),sql.Placeholder(k)) for k in obj_dict.keys()])
         update = sql.SQL('UPDATE {0} SET {1} WHERE {2}').format(table_name,set_sql,where_sql)
         if cursor is not None:
@@ -282,11 +286,15 @@ class RedisDetailQueue(object):
             return False
 
     def enqueue(self,detail):
+        if self.queue_key != 'q_3':
+            embed()
+            traceback.print_stack()
         self._update_blacklist_status(detail)
         if detail.blacklisted:
             logging.warn("detail is blacklisted, will not enqueue")
             return
         
+        #print("redis_queue_key: %s\nqueuekey %s length before enqueue: %s" % (self.redis_key,self.queue_key, self.length()))
         detail_key = detail.detail_key
         detail_queue_key = self.redis.hget(detail_key,'queue_key')
 
@@ -294,6 +302,9 @@ class RedisDetailQueue(object):
             raise RedisDetailQueueInvalid("No such queue key for detail")
         
         self.redis.rpush(self.redis_key,detail_key)
+        #print("redis_queue_key: %s\nqueuekey %s length after enqueue: %s" % (self.redis_key,self.queue_key, self.length()))
+
+
 
     def dequeue(self,requeue=True):
         if self.is_empty():
