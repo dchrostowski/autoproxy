@@ -10,6 +10,7 @@ from functools import wraps
 from copy import deepcopy
 from datetime import datetime
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+import traceback
 
 from psycopg2.extras import DictCursor
 from psycopg2 import sql
@@ -76,12 +77,15 @@ class PostgresManager(object):
     def update_detail(self,obj,cursor=None):
         table_name = sql.Identifier('details')
         obj_dict = obj.to_dict()
-        if 'detail_id' not in obj_dict:
-            raise Exception("attempting to update a detail wtihout a detail id")
-            
-        del obj_dict['detail_id']
-
         where_sql = sql.SQL("{0}={1}").format(sql.Identifier('detail_id'),sql.Placeholder('detail_id'))        
+
+        if 'detail_id' not in obj_dict:
+            if 'queue_id' not in obj_dict or 'proxy_id' not in obj_dict:
+                raise Exception("cannot update detail without a detail id, queue id, or proxy id")
+            where_sql = sql.SQL("{0}={1} AND {2}={3}").format(sql.Identifier('queue_id'),sql.Placeholder('queue_id'),sql.Identifier('proxy_id'),sql.Placeholder('proxy_id'))        
+            
+            
+
         set_sql = sql.SQL(', ').join([sql.SQL("{0}={1}").format(sql.Identifier(k),sql.Placeholder(k)) for k in obj_dict.keys()])
         update = sql.SQL('UPDATE {0} SET {1} WHERE {2}').format(table_name,set_sql,where_sql)
         if cursor is not None:
@@ -255,10 +259,15 @@ class RedisDetailQueue(object):
     def __init__(self,queue_key,active=True):
         self.redis = Redis(**configuration.redis_config)
         self.queue_key = queue_key
+        self.active = active
         active_clause = "active"
         if not active:
             active_clause = "inactive"
         self.redis_key = 'redis_%s_detail_queue_%s' % (active_clause, queue_key)
+
+    @classmethod
+    def new(cls,queue_key,active):
+        return cls(queue_key,active)
 
 
     def _update_blacklist_status(self,detail):
@@ -281,7 +290,7 @@ class RedisDetailQueue(object):
         else:
             return False
 
-    def enqueue(self,detail):
+    def enqueue(self,detail):        
         self._update_blacklist_status(detail)
         if detail.blacklisted:
             logging.warn("detail is blacklisted, will not enqueue")
@@ -293,7 +302,16 @@ class RedisDetailQueue(object):
         if detail_queue_key != self.queue_key:
             raise RedisDetailQueueInvalid("No such queue key for detail")
         
+        if detail.active and not self.active:
+            logging.warn("Attempting to enqueue an active detail into an inactive queue")
+            self.new(self.queue_key, not self.active).enqueue(detail)
+            return
+        elif not detail.active and self.active:
+            logging.warn("Attempting to enqueue an inactive detail into an active queue")
+            self.new(self.queue_key, not self.active).enqueue(detail)
+            return
         self.redis.rpush(self.redis_key,detail_key)
+
 
     def dequeue(self,requeue=True):
         if self.is_empty():
@@ -466,7 +484,8 @@ class StorageManager(object):
             new_proxy = self.redis_mgr.register_proxy(proxy)
             new_detail = Detail(proxy_key=new_proxy.proxy_key, queue_id=SEED_QUEUE_ID)
             self.redis_mgr.register_detail(new_detail)
-
+        else:
+            logging.info("proxy already exists in cache/db")
 
     def create_queue(self,url):
         logging.info("creating queue for %s" % url)
@@ -513,13 +532,13 @@ class StorageManager(object):
         new_detail_key = cloned.detail_key
 
         if self.redis_mgr.redis.exists(new_detail_key):
-            #logging.warn("trying to clone a detail into a queue where it already exists.")
+            logging.warn("trying to clone a detail into a queue where it already exists.")
             return Detail(**self.redis_mgr.redis.hgetall(new_detail_key))
 
         if new_queue_id is not None and proxy_id is not None:
             db_detail = self.db_mgr.get_detail_by_queue_and_proxy(new_queue_id,proxy_id)
             if db_detail is not None:
-                #logging.warn("Attempting to clone a detail that already exists")
+                logging.warn("Attempting to clone a detail that already exists")
                 return self.redis_mgr.register_detail(db_detail)
 
         return self.redis_mgr.register_detail(cloned)

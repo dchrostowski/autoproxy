@@ -9,9 +9,6 @@ from flask import request
 from IPython import embed
 from storage_manager import StorageManager
 
-
-print("here")
-
 app = flask.Flask(__name__)
 
 def get_hit_count():
