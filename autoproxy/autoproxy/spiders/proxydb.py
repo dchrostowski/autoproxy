@@ -18,6 +18,7 @@ class ProxydbSpider(scrapy.Spider):
     name = 'proxydb'
     allowed_domains = ['proxydb.net']
     start_urls = ['http://proxydb.net/']
+    handle_httpstatus_list = [403,404]
 
     def __init__(self,*args,**kwargs):
         self.count = int(kwargs.get('count',1))

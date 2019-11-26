@@ -9,11 +9,12 @@ from scrapy import signals
 from IPython import embed
 from proxy_manager import ProxyManager
 from exception_manager import ExceptionManager
+from util import parse_domain
 import sys
 import logging
 import twisted
 
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -107,6 +108,24 @@ class AutoproxyDownloaderMiddleware(object):
         # - or raise IgnoreRequest
         spider.logger.info("processing response for %s" % request.url)
         proxy = request.meta['proxy_obj']
+
+
+
+        if parse_domain(request.url) not in spider.allowed_domains and parse_domain(response.url) not in spider.allowed_domains:
+            logger.info("proxy redirected to a bad domain, marking bad")
+            proxy.callback(success=False)
+            return response
+
+        if response.status == 403:
+            logging.info("Got 403 response, marking bad")
+            proxy.callback(success=False)
+            return response
+
+        if response.status == 404:
+            proxy.callback(success=None, requeue=False)
+            return response
+            
+        
         proxy.callback(success=True)
         return response
 
