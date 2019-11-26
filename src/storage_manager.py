@@ -485,7 +485,7 @@ class StorageManager(object):
             new_detail = Detail(proxy_key=new_proxy.proxy_key, queue_id=SEED_QUEUE_ID)
             self.redis_mgr.register_detail(new_detail)
         else:
-            logging.info("proxy already exists in queue/db")
+            logging.info("proxy already exists in cache/db")
 
     def create_queue(self,url):
         logging.info("creating queue for %s" % url)
