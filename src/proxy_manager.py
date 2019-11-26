@@ -57,25 +57,15 @@ class ProxyManager(object):
             inactive_target_rdq.enqueue(new_detail)
         for i in range(inactive_seeds_to_dequeue):
             new_detail = self.storage_mgr.clone_detail(inactive_seed_rdq.dequeue(), target_queue)
-            inactive_target_rdq.enqueue(new_detail)
-
-        self.logger.info("seeds have been cloned, check target queue length")
-        
+            inactive_target_rdq.enqueue(new_detail)        
         
 
     def get_proxy(self,request_url):
         domain = parse_domain(request_url)
         queue = self.storage_mgr.redis_mgr.get_queue_by_domain(domain)
         
-        self.logger.info("getproxy: check queue: %s" % queue)
-        self.logger.info('get proxy for queue key %s' % queue.queue_key)
         rdq_active = RedisDetailQueue(queue_key=queue.queue_key,active=True)
         rdq_inactive = RedisDetailQueue(queue_key=queue.queue_key,active=False)
-
-        self.logger.info("get_proxy: check rdq_active and rdq_inactvie")
-
-        print("rdq_active redis key: %s" % rdq_active.redis_key)
-        print("rdq_inactive redis key: %s" % rdq_inactive.redis_key)
 
 
         self.logger.info("active queue count: %s" % rdq_active.length())
@@ -88,7 +78,6 @@ class ProxyManager(object):
             self.load_seeds(target_queue=queue)
 
         if clone_seed:
-            self.logger.info("Doing periodic seed load")
             self.load_seeds(target_queue=queue, num=1)
 
 

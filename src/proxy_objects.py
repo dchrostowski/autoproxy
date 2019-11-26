@@ -97,7 +97,7 @@ class Detail(object):
         return calling_class
 
     def __init__(self, active=False, load_time=60000, last_updated=None, last_active=DEFAULT_TIMESTAMP, last_used=DEFAULT_TIMESTAMP, bad_count=0, blacklisted=False, blacklisted_count=0, lifetime_good=0, lifetime_bad=0, proxy_id=None, queue_id=None, detail_id=None, queue_key=None, proxy_key=None, detail_key=None):
-        self._active = active
+        self.active = active
         self.load_time = load_time
         self._last_active = self.parse_timestamp(last_active)
         self._last_used = self.parse_timestamp(last_used)
@@ -149,6 +149,7 @@ class Detail(object):
     @property
     def active(self):
         return self.format_boolean(self.get_caller(),self._active)
+        #return self.format_boolean(self.get_caller(),self._active)
     
     @active.setter
     def active(self,val):
@@ -196,13 +197,12 @@ class Detail(object):
         return val
 
     def parse_boolean(self,val):
-        if val not in BOOLEAN_VALS:
+        if(val == '1' or val == 1 or val == True):
+            return True
+        elif(val == '0' or val == 0 or val == False):
+            return False
+        else:
             raise Exception("Invalid value for active")
-        if(val == '1'):
-            val = True
-        elif(val == '0'):
-            val = False
-        return val
             
 
     def to_dict(self):
@@ -317,9 +317,6 @@ class ProxyObject(Proxy):
         self.detail.last_used = datetime.now()
         return_queue = None
 
-        print("self._active_queue redis key: %s" % self._active_queue.redis_key)
-        print("self._inactive_queue redis key: %s" % self._inactive_queue.redis_key)
-
         if success is None:
             logging.info("proxy callback(success=None)")
             if self.detail.active:
@@ -353,18 +350,12 @@ class ProxyObject(Proxy):
                 self.detail.blacklisted = True
                 self.detail.active = False
                 self.detail.blacklisted_count += 1
-            
-
-
         
         self.storage_mgr.redis_mgr.update_detail(self.detail)
         logging.info("Saved detail to cache")
         
 
         if requeue:
-
-            print('chck return queue')
-            print(return_queue.queue_key)
             return_queue.enqueue(self.detail)
 
         self._active_queue = None

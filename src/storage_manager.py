@@ -259,10 +259,15 @@ class RedisDetailQueue(object):
     def __init__(self,queue_key,active=True):
         self.redis = Redis(**configuration.redis_config)
         self.queue_key = queue_key
+        self.active = active
         active_clause = "active"
         if not active:
             active_clause = "inactive"
         self.redis_key = 'redis_%s_detail_queue_%s' % (active_clause, queue_key)
+
+    @classmethod
+    def new(cls,queue_key,active):
+        return cls(queue_key,active)
 
 
     def _update_blacklist_status(self,detail):
@@ -285,28 +290,30 @@ class RedisDetailQueue(object):
         else:
             return False
 
-    def enqueue(self,detail):
-        logging.info("RedisDetailQueue enqueue()")
-        
+    def enqueue(self,detail):        
         self._update_blacklist_status(detail)
         if detail.blacklisted:
             logging.warn("detail is blacklisted, will not enqueue")
             return
         
-        #print("redis_queue_key: %s\nqueuekey %s length before enqueue: %s" % (self.redis_key,self.queue_key, self.length()))
         detail_key = detail.detail_key
         detail_queue_key = self.redis.hget(detail_key,'queue_key')
 
         if detail_queue_key != self.queue_key:
             raise RedisDetailQueueInvalid("No such queue key for detail")
         
+        if detail.active and not self.active:
+            logging.warn("Attempting to enqueue an active detail into an inactive queue")
+            self.new(self.queue_key, not self.active).enqueue(detail)
+            return
+        elif not detail.active and self.active:
+            logging.warn("Attempting to enqueue an inactive detail into an active queue")
+            self.new(self.queue_key, not self.active).enqueue(detail)
+            return
         self.redis.rpush(self.redis_key,detail_key)
-        #print("redis_queue_key: %s\nqueuekey %s length after enqueue: %s" % (self.redis_key,self.queue_key, self.length()))
-
 
 
     def dequeue(self,requeue=True):
-        logging.info("RedisDetailQueue dequeue()")
         if self.is_empty():
             raise RedisDetailQueueEmpty("No proxies available for queue key %s" % self.queue_key)
         detail = Detail(**self.redis.hgetall(self.redis.lpop(self.redis_key)))

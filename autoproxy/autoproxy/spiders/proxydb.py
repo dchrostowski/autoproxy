@@ -82,7 +82,7 @@ class ProxydbSpider(scrapy.Spider):
         proxies_by_dropdown_urls = response.xpath('//div[@aria-labelledby="navbar_dropdown_proxies_by"]/a/@href').extract()
         for url in proxies_by_dropdown_urls:
             url = response.urljoin(url)
-            req = scrapy.Request(url=url, callback=self.parse_dropdown, dont_filter=True)
+            req = scrapy.Request(url=url, callback=self.parse_dropdown)
             yield req
 
     def parse_dropdown(self,response):
