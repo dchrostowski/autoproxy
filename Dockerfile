@@ -1,4 +1,4 @@
-FROM debian:buster
+FROM debian:buster as flask
 RUN apt-get update && \
 	apt-get install --assume-yes --no-install-recommends \
 		gcc \
@@ -19,7 +19,9 @@ RUN python3 -m pip install  --upgrade \
 		setuptools \
 		wheel && \
 		python3 -m pip install -r requirements.txt && \
-		python3 -m pip install  --upgrade scrapy
+		python3 -m pip install  --upgrade scrapy && \
+		python3 -m pip install --upgrade scrapyd && \
+        python3 -m pip install --upgrade scrapyd-client
 
 
 #RUN pip3 --proxy=proxy-fg1.bcbsmn.com:9119 --trusted-host pypi.python.org --trusted-host pypi.org --trusted-host files.pythonhosted.org install -r requirements.txt
@@ -30,8 +32,11 @@ ENV PYTHONPATH=/code/src:/code:$PYTHONPATH
 
 ENV FLASK_APP /code/src/app.py
 ENV FLASK_RUN_HOST 0.0.0.0
+
 CMD ["python3", "/code/src/app.py"]
 CMD ["flask", "run"]
-#WORKDIR /code/autoproxy/autoproxy/spiders
-#CMD ["scrapy", "runspider", "streetscrape.py"]
-#CMD ['python3']
+
+FROM flask as scrapyd
+ENV PYTHONPATH=/usr/local/lib/python3.7/dist-packages/scrapyd/scripts:$PYTHONPATH
+WORKDIR /code/autoproxy
+CMD ["scrapyd"]

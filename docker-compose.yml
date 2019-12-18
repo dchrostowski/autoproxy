@@ -1,7 +1,17 @@
-version: '3'
+version: '3.4'
 services:
+  scrapyd:
+    build:
+      context: .
+      target: scrapyd
+    ports:
+      - "6800:6800"
+    depends_on:
+      - web
   web:
-    build: .
+    build:
+      context: .
+      target: flask
     ports:
       - "5000:5000"
     depends_on:

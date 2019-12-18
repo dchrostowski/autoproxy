@@ -39,6 +39,8 @@ queuelib==1.5.0
 redis==3.3.11
 Scrapy==1.8.0
 scrapy-user-agents==0.1.1
+scrapyd==1.2.1
+scrapyd-client==1.1.0
 service-identity==18.1.0
 six==1.13.0
 traitlets==4.3.3
