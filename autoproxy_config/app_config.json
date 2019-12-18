@@ -93,7 +93,7 @@
     },
 
     "scrapyd_api_endpoint": {
-        "value": "http://localhost:6800",
+        "value": "http://127.0.0.1:6800",
         "description": "URL used to access the scrapyd API"
     }
 

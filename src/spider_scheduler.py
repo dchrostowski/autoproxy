@@ -37,6 +37,9 @@ class ScrapydApi(object):
     @staticmethod
     def schedule(project,spider):
         logging.info("TO DO")
+        url = ScrapydApi.url('schedule.json')
+        resp = requests.post(url,data={'project': project, 'spider':spider})
+        return resp.json()
 
 
 
@@ -65,7 +68,8 @@ class SpiderScheduler(object):
             spiders = spiders[2:]
             for spider in spiders:
                 logging.info("starting %s" % spider)
-                ScrapydApi.schedule(project,spider)
+                resp = ScrapydApi.schedule(project,spider)
+                logging.info(resp)
 
 
 if __name__ == "__main__":
