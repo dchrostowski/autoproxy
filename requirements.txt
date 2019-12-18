@@ -1,8 +1,9 @@
 attrs==19.3.0
 Automat==0.8.0
 backcall==0.1.0
-certifi==2019.9.11
+certifi==2019.11.28
 cffi==1.13.2
+chardet==3.0.4
 Click==7.0
 constantly==15.1.0
 cryptography==2.8
@@ -37,6 +38,7 @@ PyHamcrest==1.9.0
 pyOpenSSL==19.0.0
 queuelib==1.5.0
 redis==3.3.11
+requests==2.22.0
 Scrapy==1.8.0
 scrapy-user-agents==0.1.1
 scrapyd==1.2.1
@@ -46,7 +48,7 @@ six==1.13.0
 traitlets==4.3.3
 Twisted==19.10.0
 ua-parser==0.8.0
-urllib3==1.25.6
+urllib3==1.25.7
 user-agents==2.0
 w3lib==1.21.0
 wcwidth==0.1.7
