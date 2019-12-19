@@ -175,12 +175,11 @@ def main():
 
     for i in range(MAX_JOBS):
         for kwargs in scheduler.all_spiders():
-            kwargs2 = {'project':'autoproxy','spider':'streetscrape'}
-            tq.enqueue(Task(**kwargs2, fn=schedule_spider))
+            tq.enqueue(Task(**kwargs, fn=schedule_spider))
             
     elapsed_time = datetime.datetime.now() - scheduler.start_time
 
-    while elapsed_time.seconds < 45:
+    while elapsed_time.seconds < 5000:
         print("not time to sync yet")
         time.sleep(3)
         current_time = datetime.datetime.now()
