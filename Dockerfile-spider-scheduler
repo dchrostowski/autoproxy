@@ -2,7 +2,7 @@ FROM python:3
 RUN mkdir /code
 WORKDIR /code
 COPY . .
-RUN python3 -m pip   --upgrade pip
-RUN python3 -m pip  -r scheduler_requirements.txt
+RUN python3 -m pip install --upgrade pip
+RUN python3 -m pip install -r scheduler_requirements.txt
 ENV PYTHONPATH=/code/src:/code:/usr/local/lib/python3.7/dist-packages/scrapyd/scripts:$PYTHONPATH
 CMD ["python3", "/code/src/spider_scheduler.py"]
