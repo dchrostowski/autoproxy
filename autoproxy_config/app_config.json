@@ -95,6 +95,11 @@
     "scrapyd_api_endpoint": {
         "value": "http://127.0.0.1:6800",
         "description": "URL used to access the scrapyd API"
+    },
+
+    "scrapyd_max_jobs_per_spider": {
+        "value": 2,
+        "description":  "how many instances of each spider may be enqueued at once"
     }
 
 }
