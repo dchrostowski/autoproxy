@@ -1,19 +1,11 @@
-version: '3.4'
+version: '3'
 services:
-  scrapyd:
-    build:
-      context: .
-      target: scrapyd
-    ports:
-      - "6800:6800"
-    depends_on:
-      - web
   web:
     build:
       context: .
-      target: flask
+      dockerfile: ./Dockerfile
     ports:
-      - "5000:5000"
+      - "6800:6800"
     depends_on:
       - db
       - redis
@@ -21,11 +13,12 @@ services:
     image: "redis:alpine"
     ports:
       - "5379:6379"
+    container_name: "autoproxy_redis"
   db:
 #   Use the Docker Image postgres. This will pull the newest release.
     image: "postgres"
 #   Give the container the name my_postgres. You can changes to something else.
-    container_name: "proxies"
+    container_name: "autoproxy_db"
 #   Setup the username, password, and database name. You can changes these values.
     environment:
       - POSTGRES_USER=postgres
@@ -38,3 +31,9 @@ services:
 #   I used the name postgres-data but you can changed it to something else.
     volumes:
       - ./database/:/docker-entrypoint-initdb.d/
+  spider_scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile-spider-scheduler
+    depends_on:
+      - web

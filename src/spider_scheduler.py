@@ -8,12 +8,14 @@ import queue
 import time
 import datetime
 import itertools
+from storage_manager import StorageManager
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 
 app_config = lambda config_val: configuration.app_config[config_val]['value']
 SCRAPYD_API_URL = app_config('scrapyd_api_endpoint')
 MAX_JOBS = app_config('scrapyd_max_jobs_per_spider')
+SYNC_INTERVAL = app_config('sync_interval')
 
 
 class Task(object):
@@ -85,7 +87,7 @@ class ScrapydApi(object):
         url = ScrapydApi.url('schedule.json')
         resp = requests.post(url,data={'project': project, 'spider':spider})
         if resp.json()['status'] == 'ok':
-            print("OK")
+            logging.info("OK")
         else:
             logging.warn("Error while scheduling spider: %s" % resp.json()['message'] )
             return None
@@ -106,7 +108,8 @@ class SpiderScheduler(object):
             try:
                 daemon_status = ScrapydApi.daemon_status()
             except requests.exceptions.ConnectionError:
-                logging.info("scrapyd server refused connection, will keep trying.")
+                logging.info("scrapyd server refused connection.  Check the url is correct? %s" % SCRAPYD_API_URL)
+                logging.info("If running this inside the docker container, the hostname shouldn't be localhost")
                 time.sleep(5)
 
         if daemon_status['status'] == 'ok':
@@ -181,12 +184,13 @@ if __name__ == "__main__":
 
     def do_sync():
         while len(scheduler.active_jobs()) > 0:
-            print('waiting for the jobs to stop')
-            print("there are %s active jobs" % len(scheduler.active_jobs()))
+            logging.info('waiting for the jobs to stop')
+            logging.info("there are %s active jobs" % len(scheduler.active_jobs()))
             time.sleep(5)
-        print("STARTING SYNC...")
-        time.sleep(5)
-        print("SYNC COMPLETE")
+        logging.info("STARTING SYNC...")
+        storage_mgr = StorageManager()
+        storage_mgr.sync_to_db()
+        logging.info("SYNC COMPLETE")
         now = datetime.datetime.now()
         scheduler.start_time = now
         scheduler.allow_new_jobs = True
@@ -195,18 +199,17 @@ if __name__ == "__main__":
 
     spider_gen = scheduler.spider_generator('autoproxy')
     for spider in itertools.cycle(spider_gen):
-        if len(scheduler.active_jobs(**spider)) < 4:
+        if len(scheduler.active_jobs(**spider)) < MAX_JOBS:
             if scheduler.allow_new_jobs:
-                print("enqueueing task to schedule %s" % spider)
-                if spider['spider'] == 'streetscrape':
-                    tq.enqueue(Task(**spider,fn=schedule_spider))
+                logging.info("enqueueing task to schedule %s" % spider)
+                tq.enqueue(Task(**spider,fn=schedule_spider))
         
         now = datetime.datetime.now()
         start = scheduler.start_time
         elapsed = now - start
-        print("elapsed time since last sync: %s" % elapsed.seconds)
-        if elapsed.seconds > 60 and scheduler.allow_new_jobs:
-            print("enqueuing sync task")
+        logging.info("elapsed time since last sync: %s" % elapsed.seconds)
+        if elapsed.seconds > SYNC_INTERVAL and scheduler.allow_new_jobs:
+            logging.info("enqueuing sync task")
             scheduler.allow_new_jobs = False
             tq.enqueue(Task(fn=do_sync))
         
