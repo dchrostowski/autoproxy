@@ -7,6 +7,7 @@ from threading import Thread
 import queue
 import time
 import datetime
+import itertools
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 
@@ -18,7 +19,7 @@ MAX_JOBS = app_config('scrapyd_max_jobs_per_spider')
 class Task(object):
     def __init__(self,*args,**kwargs):
         self.fn = kwargs.pop('fn')
-        self.requeue = kwargs.pop('requeue',True)
+        self.requeue = kwargs.pop('requeue',False)
         self.args = args
         self.kwargs = kwargs
 
@@ -33,7 +34,6 @@ class TaskQueue(object):
         self.thread.start()
 
     def enqueue(self,task):
-        
         self.queue.put(task)
 
     @staticmethod
@@ -48,7 +48,8 @@ class TaskQueue(object):
                 break
             task.execute()
             self.queue.task_done()
-            self.enqueue(task)
+            if task.requeue:
+                self.enqueue(task)
 
     def finish(self):
         self.queue.put(None)
@@ -110,18 +111,51 @@ class SpiderScheduler(object):
 
         if daemon_status['status'] == 'ok':
             self.start_time = datetime.datetime.now()
-            self.have_synced = False
+            self.allow_new_jobs = True
             project_list = ScrapydApi.list_projects()
             self.project_spiders = {}
             
             for project in project_list:
                 self.project_spiders[project] = ScrapydApi.list_spiders(project)[2:]
 
+            self.projects = project_list
+
     def all_spiders(self):
         for project, spiders in self.project_spiders.items():
             for spider in spiders:
                 yield {"project": project, "spider": spider}
 
+    def active_jobs(self, project=None, spider=None):
+        num_active_jobs = 0
+        if spider is not None and project is None:
+            raise Exception("Must specifiy a project with spider")
+        
+        projects = self.projects
+        
+        if project is not None:
+            projects = [self.projects]
+
+        def filter_jobs(job):
+            if spider is not None:
+                if spider == job['spider']:
+                    return True
+                return False
+            return True
+
+        active_jobs = []
+        for project in projects:
+            jobs = ScrapydApi.list_jobs(project)
+            pending_jobs = filter(filter_jobs,jobs['pending'])
+            running_jobs = filter(filter_jobs,jobs['running'])
+            
+            active_jobs.extend(list(pending_jobs) + list(running_jobs))
+
+        return active_jobs
+
+
+    def spider_generator(self,project):
+        for spider in self.project_spiders[project]:
+            yield {'project':project,'spider':spider}
 
     def run_spiders(self):
         for project, spiders in self.project_spiders.items():
@@ -132,81 +166,48 @@ class SpiderScheduler(object):
                 resp = ScrapydApi.schedule(project,spider)
                 logging.info(resp)
 
-
-def check_kwargs(**kwargs):
-    print("check kwargs: project: %s spider: %s" % (kwargs.get('project',None), kwargs.get('spider',None)))
+            
 
 tq = TaskQueue()
-def main():
-    scheduler = SpiderScheduler()
-    projects = scheduler.project_spiders.keys()
-
-
-    def number_of_jobs_left():
-        num_jobs_left = 0
-        for project in projects:
-            jobs_info = ScrapydApi.list_jobs(project)
-            pending_and_running = len(jobs_info['pending']) + len(jobs_info['running'])
-            num_jobs_left += pending_and_running
-        
-        return num_jobs_left
-
-    def sync_when_there_are_no_jobs():
-        job_count = number_of_jobs_left()
-        while job_count > 0:
-            time.sleep(5)
-            job_count = number_of_jobs_left()
-            print("there are %s jobs left." % job_count)
-
-        print("all the jobs are done")
-        print("no morestart the sync now")
-        print("syncing...")
-        time.sleep(5)
-        print("done syncing")
-        scheduler.have_synced = True
-    
-    def schedule_spider(*args,**kwargs):
-        some_delta = datetime.datetime.now() - scheduler.start_time
-        if some_delta.seconds % 3 == 0:
-            ScrapydApi.schedule(kwargs['project'],kwargs['spider'])
-        time.sleep(4)
-        print("there are %s jobs scheduled" % number_of_jobs_left())
-
-
-    for i in range(MAX_JOBS):
-        for kwargs in scheduler.all_spiders():
-            tq.enqueue(Task(**kwargs, fn=schedule_spider))
-            
-    elapsed_time = datetime.datetime.now() - scheduler.start_time
-
-    while elapsed_time.seconds < 5000:
-        print("not time to sync yet")
-        time.sleep(3)
-        current_time = datetime.datetime.now()
-        print("current itme is %s" % current_time)
-        print("scheduler start time was %s" % scheduler.start_time)
-        elapsed_time = current_time - scheduler.start_time
-        print("elapsed seconds: %s" % elapsed_time.seconds)
-    
-    print("sync task has been enqueued")
-    tq.enqueue(Task(fn=sync_when_there_are_no_jobs,requeue=False))
-    
-
-    while not scheduler.have_synced:
-        time.sleep(5)
-        print("awaiting sync...")
-    
-    return main()
-            
-
-    
-
-        
-        
-
-
-
-    #tq = TaskQueue(default_task_fn=)
 
 if __name__ == "__main__":
-    main()
+    scheduler = SpiderScheduler()
+    all_active_jobs = scheduler.active_jobs()
+    streetscrape_active_jobs = scheduler.active_jobs('autoproxy','streetscrape')
+    proxydb_active_jobs = scheduler.active_jobs('autoproxy','proxydb')
+
+    def schedule_spider(project,spider):
+        ScrapydApi.schedule(project,spider)
+
+    def do_sync():
+        while len(scheduler.active_jobs()) > 0:
+            print('waiting for the jobs to stop')
+            print("there are %s active jobs" % len(scheduler.active_jobs()))
+            time.sleep(5)
+        print("STARTING SYNC...")
+        time.sleep(5)
+        print("SYNC COMPLETE")
+        now = datetime.datetime.now()
+        scheduler.start_time = now
+        scheduler.allow_new_jobs = True
+        
+
+
+    spider_gen = scheduler.spider_generator('autoproxy')
+    for spider in itertools.cycle(spider_gen):
+        if len(scheduler.active_jobs(**spider)) < 4:
+            if scheduler.allow_new_jobs:
+                print("enqueueing task to schedule %s" % spider)
+                if spider['spider'] == 'streetscrape':
+                    tq.enqueue(Task(**spider,fn=schedule_spider))
+        
+        now = datetime.datetime.now()
+        start = scheduler.start_time
+        elapsed = now - start
+        print("elapsed time since last sync: %s" % elapsed.seconds)
+        if elapsed.seconds > 60 and scheduler.allow_new_jobs:
+            print("enqueuing sync task")
+            scheduler.allow_new_jobs = False
+            tq.enqueue(Task(fn=do_sync))
+        
+        time.sleep(2)
