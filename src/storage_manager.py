@@ -258,6 +258,22 @@ class PostgresManager(object):
         detail = Detail(**detail_data)
         cursor.close()
         return detail
+
+    def get_proxy_by_address_and_port(self,address,port):
+        query = "SELECT * FROM proxies where address=%(address)s AND port=%(port)s"
+        params = {'address': address, 'port':port}
+        cursor = self.cursor()
+        cursor.execute(query,params)
+        proxy_data = cursor.fetchone()
+        if proxy_data is None:
+            cursor.close()
+            return None
+        proxy = Proxy(**proxy_data)
+        cursor.close()
+        return proxy
+
+    
+
         
 
 class Redis(redis.Redis):
@@ -577,13 +593,24 @@ class StorageManager(object):
             queue_keys_to_id[q.queue_key] = queue_id
 
         for p in new_proxies:
-            self.db_mgr.insert_proxy(p,cursor)
-            proxy_id = cursor.fetchone()[0]
-            proxy_keys_to_id[p.proxy_key] = proxy_id
+            try:
+                self.db_mgr.insert_proxy(p,cursor)
+                proxy_id = cursor.fetchone()[0]
+                proxy_keys_to_id[p.proxy_key] = proxy_id
+            except psycopg2.errors.UniqueViolation as e:
+                logging.warn("Duplicate proxy, fetch proxy id from database.")
+                # existing_proxy = self.db_mgr.get_proxy_by_address_and_port(p.address,p.port)
+                proxy_keys_to_id[p.proxy_key] = None
+
 
         for d in new_details:
             if d.proxy_id is None:
-                d.proxy_id = proxy_keys_to_id[d.proxy_key]
+                new_proxy_id = proxy_keys_to_id[d.proxy_key]
+                if new_proxy_id is None:
+                    logging.warn("Discarding new detail, as it may already exist.")
+                    continue
+                else:
+                    d.proxy_id = new_proxy_id
             if d.queue_id is None:
                 d.queue_id = queue_keys_to_id[d.queue_key]
             self.db_mgr.insert_detail(d,cursor)

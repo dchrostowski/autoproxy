@@ -338,7 +338,8 @@ class ProxyObject(Proxy):
             #self.detail.decrement_bad_count()
             self.detail.lifetime_good += 1
             if DECREMENT_BLACKLIST:
-                self.detail.blacklisted_count -= 1
+                if self.detail.blacklisted_count > 0:
+                    self.detail.blacklisted_count -= 1
             
         else:
             logging.info("proxy callback(success=False)")

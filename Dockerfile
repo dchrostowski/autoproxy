@@ -29,6 +29,5 @@ COPY . /code
 ENV PYTHONPATH=/code/src:/code:/usr/local/lib/python3.7/dist-packages/scrapyd/scripts:$PYTHONPATH
 EXPOSE 6800
 WORKDIR /code/autoproxy
-CMD ["cd /code/autoproxy"]
 CMD ["scrapyd"]
 
