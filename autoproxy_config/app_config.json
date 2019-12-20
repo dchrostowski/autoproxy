@@ -107,8 +107,13 @@
     },
 
     "scrapyd_max_jobs_per_spider": {
-        "value": 2,
+        "value": 4,
         "description":  "how many instances of each spider may be enqueued at once"
+    },
+
+    "scapyd_job_timeout": {
+        "value": 300,
+        "description": "number of seconds a spider has to complete its job"
     }
 
 }

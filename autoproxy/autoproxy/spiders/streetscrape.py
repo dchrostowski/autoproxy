@@ -8,7 +8,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 class StreetscrapeSpider(scrapy.Spider):
     name = 'streetscrape'
-    allowed_domains = ['streetscrape.com']
+    allowed_domains = ['proxycrawler.com']
     start_urls = ['https://api.dev.proxycrawler.com/proxy/test']
 
     def __init__(self,*args,**kwargs):
