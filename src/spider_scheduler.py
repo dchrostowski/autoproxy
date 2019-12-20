@@ -16,6 +16,7 @@ app_config = lambda config_val: configuration.app_config[config_val]['value']
 SCRAPYD_API_URL = app_config('scrapyd_api_endpoint')
 MAX_JOBS = app_config('scrapyd_max_jobs_per_spider')
 SYNC_INTERVAL = app_config('sync_interval')
+SCRAPYD_JOB_TIMEOUT = app_config('scrapyd_job_timeout')
 
 
 class Task(object):
@@ -98,6 +99,13 @@ class ScrapydApi(object):
         resp = requests.get(url, params={'project':project})
         return resp.json()
 
+    @staticmethod
+    def cancel_job(project,job_id):
+        url = ScrapydApi.url('cancel.json')
+        resp = requests.post(url, data={"project":project, "job":job_id})
+        logging.info(resp.json())
+        return resp.json()
+
 
 
 
@@ -127,6 +135,29 @@ class SpiderScheduler(object):
         for project, spiders in self.project_spiders.items():
             for spider in spiders:
                 yield {"project": project, "spider": spider}
+
+    def get_timed_out_jobs(self,project=None):
+        projects = self.projects
+        if project is not None:
+            projects = [project]
+        timed_out = []
+
+        for project in projects:
+            active_jobs = self.active_jobs(project)
+            for job in active_jobs:
+                job_start_date = job.get('start_time',None)
+                if job_start_date is not None:
+                    job_start_date = datetime.datetime.fromisoformat(job_start_date)
+                    now = datetime.datetime.utcnow()
+                    elapsed = now - job_start_date
+                    if elapsed.seconds > SCRAPYD_JOB_TIMEOUT:
+                        job['project'] = project
+                        job['elapsed_seconds'] = elapsed.seconds
+                        timed_out.append(job)
+        
+        return timed_out
+
+
 
     def active_jobs(self, project=None, spider=None):
         num_active_jobs = 0
@@ -186,6 +217,18 @@ if __name__ == "__main__":
         while len(scheduler.active_jobs()) > 0:
             logging.info('waiting for the jobs to stop')
             logging.info("there are %s active jobs" % len(scheduler.active_jobs()))
+            timed_out_jobs = scheduler.get_timed_out_jobs()
+            if len(timed_out_jobs) > 0:
+                logging.warn("There are %s timed out jobs" % len(timed_out_jobs))
+                for toj in timed_out_jobs:
+                    to_project = toj['project']
+                    to_jid = toj['id']
+                    to_spider = toj['spider']
+                    logging.info("Terminating %s job with id %s " % (to_spider,to_jid))
+                    ScrapydApi.cancel_job(to_project,to_jid)
+
+
+
             time.sleep(5)
         logging.info("STARTING SYNC...")
         storage_mgr = StorageManager()

@@ -111,8 +111,8 @@
         "description":  "how many instances of each spider may be enqueued at once"
     },
 
-    "scapyd_job_timeout": {
-        "value": 300,
+    "scrapyd_job_timeout": {
+        "value": 330,
         "description": "number of seconds a spider has to complete its job"
     }
 
