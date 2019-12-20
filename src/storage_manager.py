@@ -130,7 +130,7 @@ class PostgresManager(object):
         self.insert_object(queue,'queues','queue_id', cursor)
 
     def insert_proxy(self,proxy,cursor=None):
-            self.insert_object(proxy,'proxies','proxy_id',cursor)
+        self.insert_object(proxy,'proxies','proxy_id',cursor)
 
     def init_seed_details(self):
         seed_count = self.do_query("SELECT COUNT(*) as c FROM details WHERE queue_id=%(queue_id)s", {'queue_id':SEED_QUEUE_ID})[0]['c']
