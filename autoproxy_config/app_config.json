@@ -3,6 +3,15 @@
         "value": 7200,
         "description": "Minimum number of seconds that must pass before using proxy again"
     },
+    "max_db_connect_attempts": {
+        "value": 10,
+        "description": "If running in a docker container for the first time, spiders may need to wait for the database to get fully loaded and started."
+    },
+
+    "db_connect_attempt_interval": {
+        "value": 15,
+        "description": "Number of seconds to wait before retrying db connection"
+    },
 
     "blacklist_threshold": {
         "value": 4,
@@ -55,7 +64,7 @@
     },
 
     "sync_interval": {
-        "value": 1800,
+        "value": 300,
         "description": "How many seconds between syncing cache with database"
     },
 

@@ -39,6 +39,8 @@ TEMP_ID_COUNTER = 'temp_id_counter'
 BLACKLIST_THRESHOLD = app_config('blacklist_threshold')
 MAX_BLACKLIST_COUNT = app_config('max_blacklist_count')
 BLACKLIST_TIME = app_config('blacklist_time')
+MAX_DB_CONNECT_ATTEMPTS = app_config('max_db_connect_attempts')
+DB_CONNECT_ATTEMPT_INTERVAL = app_config("db_connect_attempt_interval")
 
 # decorator for RedisManager methods
 def block_if_syncing(func):
@@ -55,11 +57,23 @@ class PostgresManager(object):
         connect_params = configuration.db_config
         connect_params.update({'cursor_factory':DictCursor})
         self.connect_params = connect_params
+        self.connect_attempts = 0
 
     def new_connection(self):
-        conn = psycopg2.connect(**self.connect_params)
-        conn.set_session(autocommit=True)
-        return conn
+        if self.connect_attempts < MAX_DB_CONNECT_ATTEMPTS:
+            try:
+                conn = psycopg2.connect(**self.connect_params)
+                conn.set_session(autocommit=True)
+            except Exception as e:
+                self.connect_attempts +=1
+                logging.info("Connection attempt %s/%s" % (self.connect_attempts, MAX_DB_CONNECT_ATTEMPTS))
+                logging.info("Might need a little time for the database to initialiaze.  Sleeping for %s seconds" % DB_CONNECT_ATTEMPT_INTERVAL)
+                time.sleep(DB_CONNECT_ATTEMPT_INTERVAL)
+                return self.new_connection()
+
+            return conn
+        else:
+            raise Exception("Failed to connect to the database.")
     
     def cursor(self):
         return self.new_connection().cursor()
