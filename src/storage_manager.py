@@ -479,7 +479,7 @@ class RedisManager(object):
         self.redis.sadd('changed_details',detail.detail_key)
 
     def get_proxy_by_address_and_port(self,address,port):
-        proxy_keys = self.redis.keys('p*')
+        proxy_keys = self.redis.keys('p*') + self.redis.keys('pt*')
         all_proxies = [Proxy(**self.redis.hgetall(pkey)) for pkey in proxy_keys]
         proxy_dict = {"%s:%s" % (proxy.address,proxy.port): proxy for proxy in all_proxies}
         search_key = "%s:%s" % (address,port)
