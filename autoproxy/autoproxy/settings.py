@@ -23,7 +23,7 @@ NEWSPIDER_MODULE = 'autoproxy.spiders'
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = False
 RETRY_ENABLED = False
-DOWNLOAD_TIMEOUT =14
+DOWNLOAD_TIMEOUT =30
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
 #CONCURRENT_REQUESTS = 32
 
