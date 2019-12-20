@@ -26,10 +26,6 @@ cd autoproxy
 docker-compose build
 docker-compose up
 ```
-Open a browser and go to `http://localhost:5000/runspider?spider=streetscrape&count=1`
-
-This will run a spider against my proxy tester API and print out the results on the page. 
-
 To schedule jobs and such, there is a scrapyd service running.  Open a browser and go to `http://localhost:6800`.  More information on scrapyd is available at `https://scrapyd.readthedocs.io/en/latest/`.
 
 ### Conceptual Model
