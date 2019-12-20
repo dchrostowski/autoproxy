@@ -26,7 +26,10 @@ cd autoproxy
 docker-compose build
 docker-compose up
 ```
-To schedule jobs and such, there is a scrapyd service running.  Open a browser and go to `http://localhost:6800`.  More information on scrapyd is available at `https://scrapyd.readthedocs.io/en/latest/`.
+
+There is a service calld proxy_scheduler (`src/proxy_scheduler.py`) which will automatically schedule crawling jobs using scrapyd. Open a browser and go to `http://localhost:6800/jobs` to get an idea of what's going on.  More information on scrapyd is available at `https://scrapyd.readthedocs.io/en/latest/`.
+
+
 
 ### Conceptual Model
 This system incorporates an object-oriented design approach to catalog proxies.  The three critical classes are `Proxy`, `Queue`, and `Detail`.  The `Proxy` class simply contains a static representation of an IP address, port, and protocol of a public proxy server.  The `Queue` class is used to represent a target web resource to scrape.  The `Detail` class contains proxy data which is continually updated for a given `Proxy` and `Queue`.  The purpose for each of these classes are documented in detail below.
