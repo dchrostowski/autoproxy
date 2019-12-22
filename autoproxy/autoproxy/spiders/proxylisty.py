@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 import scrapy
-from IPython import embed
 from storage_manager import StorageManager
 from proxy_objects import Proxy
+import sys
+import logging
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+
 
 class ProxylistySpider(scrapy.Spider):
     name = 'proxylisty'
