@@ -13,6 +13,13 @@ class ProxylistySpider(scrapy.Spider):
         self.count = int(kwargs.get('count',1))
         self.storage_mgr = StorageManager()
 
+    def start_requests(self):
+        for i in range(self.count):
+            request = scrapy.Request(url='http://www.proxylisty.com/ip-proxylist', dont_filter=True)
+            logging.info("GET %s" % request.url)
+
+            yield request
+
     def parse(self, response):
 
         trs = response.xpath('//div[@id="content"]//table[1]/tr[position()>1]')
