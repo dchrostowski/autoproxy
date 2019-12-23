@@ -9,7 +9,8 @@ services:
     depends_on:
       - db
       - redis
-    env_file: scrapyd/scrapyd.env
+    env_file: 
+      - ./scrapyd/scrapyd.env
   redis:
     image: "redis:alpine"
     ports:

@@ -22,19 +22,23 @@ RUN pip3 install  --upgrade \
 		wheel && \
 		pip3  install -r requirements.txt && \
 		pip3 install  --upgrade scrapy && \
-		pip3 install --upgrade scrapyd && \
-		pip3 install --upgrade chaperone \
-		&& mkdir /etc/chaperone
+		pip3 install --upgrade scrapyd
 
+RUN mkdir /start
 ADD ./scrapyd/scrapyd.conf /etc/scrapyd/scrapyd.conf
 ADD ./scrapyd/nginx.conf /etc/nginx/sites-enabled/default
-ADD ./scrapyd/chaperone.conf /etc/chaperone.d/chaperone.conf
-
+ADD ./scrapyd/start_scrapyd.sh /start/start_scrapyd.sh
+ADD ./scrapyd/scrapyd.env /start/scrapyd.env
+RUN chmod +x /start/start_scrapyd.sh
 
 RUN mkdir /code
 COPY ./middleware /code/middleware/
 COPY ./autoproxy_config /code/autorpoxy_config/
 ENV PYTHONPATH=/code/middleware:/code:/usr/local/lib/python3.7/dist-packages/scrapyd/scripts:$PYTHONPATH
+RUN ls /code
+RUN ls /code/middleware
+RUN echo $PYTHONPATH
 EXPOSE 6800
-ENTRYPOINT ["/usr/local/bin/chaperone"]
+WORKDIR /start
+ENTRYPOINT sh /start/start_scrapyd.sh
 
