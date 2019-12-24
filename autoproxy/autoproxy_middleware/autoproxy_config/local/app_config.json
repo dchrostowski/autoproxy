@@ -1,0 +1,119 @@
+{
+    "proxy_interval": {
+        "value": 7200,
+        "description": "Minimum number of seconds that must pass before using proxy again"
+    },
+    "max_db_connect_attempts": {
+        "value": 10,
+        "description": "If running in a docker container for the first time, spiders may need to wait for the database to get fully loaded and started."
+    },
+
+    "db_connect_attempt_interval": {
+        "value": 15,
+        "description": "Number of seconds to wait before retrying db connection"
+    },
+
+    "blacklist_threshold": {
+        "value": 4,
+        "description": "Number of bad requests before proxy is put into blacklisted state"
+    },
+
+    "blacklist_time": {
+        "value": 86400,
+        "description": "Amount of time proxy must stay in blacklisted state"
+    },
+
+    "max_blacklist_count": {
+        "value": 10,
+        "description": "Max number of times a proxy can enter blacklist state before it is permanently blacklisted"
+    },
+
+    "decrement_blacklist": {
+        "value": true,
+        "description": "Decrement blacklist upon successful request."
+    },
+
+    "designated_endpoint": {
+        "value": "https://api.dev.proxycrawler.com/proxy/test",
+        "description": "A designated test endpoint which does not blacklist any requests."
+    },
+
+    "seed_queue": {
+        "value": 1,
+        "description": "Reserved queue id which is used only for the designated endpoint"
+    },
+
+    "aggregate_queue": {
+        "value": 2,
+        "description": "Reserved queue id that aggregates all proxy detail records for all queues except the seed"
+    },
+
+    "seed_frequency": {
+        "value": 0.10,
+        "description": "Percent/probability for when to use a new seed proxy"
+    },
+
+    "min_active": {
+        "value": 25,
+        "description": "minimum active queue count before drawing from active queue"
+    },
+
+    "inactive_pct": {
+        "value": 0.35,
+        "description": "Percent/probability for when to use an unblacklisted, inactive proxy (sum of this and seed_frequency should not exceed 1)"
+    },
+
+    "sync_interval": {
+        "value": 1000,
+        "description": "How many seconds between syncing cache with database"
+    },
+
+    "active_proxies_per_queue": {
+        "value": 200,
+        "description": "The max number of active proxies to be loaded into memory per sync interval order by last_used descending"
+    },
+
+    "inactive_proxies_per_queue": {
+        "value": 100,
+        "descripton": "The number of inactive proxies to be loaded into memory per sync interval"
+    },
+
+    "seed_proxies_per_queue": {
+        "value": 200,
+        "description": "The number of new proxies to try out"
+    },
+
+    "redis_proxy_char": {
+        "value": "p"
+    },
+    "redis_detail_char": {
+        "value": "d"
+    },
+    "redis_queue_char": {
+        "value": "q"
+    },
+
+    "overrides": {
+
+        "queues": {
+            "3": {}
+        },
+        "description": "Override any config settings above only for specific queues"
+    },
+
+    "scrapyd_api_endpoint": {
+        "value": "http://scrapyd:6800",
+        "description": "URL used to access the scrapyd API"
+    },
+
+    "scrapyd_max_jobs_per_spider": {
+        "value": 4,
+        "description":  "how many instances of each spider may be enqueued at once"
+    },
+
+    "scrapyd_job_timeout": {
+        "value": 330,
+        "description": "number of seconds a spider has to complete its job"
+    }
+
+}
