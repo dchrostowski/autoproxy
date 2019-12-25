@@ -1,0 +1,55 @@
+from urllib.parse import urlparse
+import re
+import random
+import sys
+import logging
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+from datetime import datetime
+
+
+def parse_domain(url):
+    parsed = urlparse(url)
+    domain = re.search(r'([^\.]+\.[^\.]+$)',parsed.netloc).group(1)
+    return domain
+
+def flip_coin(prob):
+    mark = prob * 100
+    result = random.random() * 100
+    if result < mark:
+        return True
+    return False
+
+def format_redis_boolean(bool_val):
+    if bool_val == True:
+        return '1'
+    elif bool_val == False:
+        return '0'
+
+    else:
+        raise Exception("invalid boolean")
+
+def format_redis_timestamp(datetime_object):
+    if type(datetime_object) != datetime:
+        raise Exception("invalid type while formatting datetime to str")
+    return datetime_object.isoformat()
+
+def parse_boolean(val):
+    if(val == '1' or val == 1 or val == True):
+        return True
+    elif(val == '0' or val == 0 or val == False):
+        return False
+    else:
+        raise Exception("Invalid value for proxy object boolean")
+
+def parse_timestamp(timestamp_val):
+    if type(timestamp_val) == datetime:
+        return timestamp_val
+
+    if type(timestamp_val) == str:
+        return datetime.fromisoformat(timestamp_val)
+
+    else:
+        raise Exception("Invalid type for proxy object timestamp")
+
+
+    

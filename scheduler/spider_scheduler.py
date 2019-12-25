@@ -1,19 +1,22 @@
 import requests
 from IPython import embed
-from autoproxy_config.config import configuration
+from scrapy_autoproxy.config import configuration
 import sys
+import os
 import logging
 from threading import Thread
 import queue
 import time
 import datetime
 import itertools
-from storage_manager import StorageManager
+from scrapy_autoproxy.storage_manager import StorageManager
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-
+from requests.auth import HTTPBasicAuth
 
 app_config = lambda config_val: configuration.app_config[config_val]['value']
 SCRAPYD_API_URL = app_config('scrapyd_api_endpoint')
+SCRAPYD_USERNAME = os.environ.get('SCRAPYD_USERNAME')
+SCRAPYD_PASSWORD = os.environ.get('SCRAPYD_PASSWORD')
 MAX_JOBS = app_config('scrapyd_max_jobs_per_spider')
 SYNC_INTERVAL = app_config('sync_interval')
 SCRAPYD_JOB_TIMEOUT = app_config('scrapyd_job_timeout')
@@ -66,27 +69,32 @@ class ScrapydApi(object):
         return "%s/%s" % (SCRAPYD_API_URL,path)
 
     @staticmethod
+    def auth():
+        return HTTPBasicAuth(SCRAPYD_USERNAME,SCRAPYD_PASSWORD)
+
+    @staticmethod
     def daemon_status():
         url = ScrapydApi.url('daemonstatus.json')
-        resp = requests.get(url)
+        resp = requests.get(url, auth=ScrapydApi.auth())
+        embed()
         return resp.json()
 
     @staticmethod
     def list_projects():
         url = ScrapydApi.url('listprojects.json')
-        resp = requests.get(url)
+        resp = requests.get(url, auth=ScrapydApi.auth())
         return resp.json()['projects']
     
     @staticmethod
     def list_spiders(project):
         url = ScrapydApi.url('listspiders.json')
-        resp = requests.get(url, params={'project':project})
+        resp = requests.get(url, params={'project':project}, auth=ScrapydApi.auth())
         return resp.json()['spiders']
 
     @staticmethod
     def schedule(project,spider):
         url = ScrapydApi.url('schedule.json')
-        resp = requests.post(url,data={'project': project, 'spider':spider})
+        resp = requests.post(url,data={'project': project, 'spider':spider}, auth=ScrapydApi.auth())
         if resp.json()['status'] == 'ok':
             logging.info("OK")
         else:
@@ -96,13 +104,13 @@ class ScrapydApi(object):
     @staticmethod
     def list_jobs(project):
         url = ScrapydApi.url('listjobs.json')
-        resp = requests.get(url, params={'project':project})
+        resp = requests.get(url, params={'project':project}, auth=ScrapydApi.auth())
         return resp.json()
 
     @staticmethod
     def cancel_job(project,job_id):
         url = ScrapydApi.url('cancel.json')
-        resp = requests.post(url, data={"project":project, "job":job_id})
+        resp = requests.post(url, data={"project":project, "job":job_id}, auth=ScrapydApi.auth())
         logging.info(resp.json())
         return resp.json()
 

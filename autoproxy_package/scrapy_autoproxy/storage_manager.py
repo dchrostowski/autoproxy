@@ -15,10 +15,10 @@ import traceback
 from psycopg2.extras import DictCursor
 from psycopg2 import sql
 from IPython import embed
-from proxy_objects import Proxy, Detail, Queue
-from util import parse_domain
+from scrapy_autoproxy.proxy_objects import Proxy, Detail, Queue
+from scrapy_autoproxy.util import parse_domain
 
-from autoproxy_config.config import configuration
+from scrapy_autoproxy.config import configuration
 app_config = lambda config_val: configuration.app_config[config_val]['value']
 
 SEED_QUEUE_ID = app_config('seed_queue')
@@ -421,7 +421,7 @@ class RedisManager(object):
         else:
             redis_key += '_%s' % obj.id()
         
-        self.redis.hmset(redis_key,obj.to_dict())
+        self.redis.hmset(redis_key,obj.to_dict(redis_format=True))
         return redis_key
 
     @block_if_syncing
@@ -452,7 +452,7 @@ class RedisManager(object):
             logging.warn("Detail already exists")
             return Detail(**self.redis.hgetall(detail_key))
         else:
-            self.redis.hmset(detail_key, detail.to_dict())
+            self.redis.hmset(detail_key, detail.to_dict(redis_format=True))
         
         relational_keys = {'proxy_key': detail.proxy_key, 'queue_key': detail.queue_key}
         self.redis.hmset(detail_key, relational_keys)
@@ -491,7 +491,7 @@ class RedisManager(object):
         return Proxy(**self.redis.hgetall(proxy_key))
 
     def update_detail(self,detail):
-        self.redis.hmset(detail.detail_key,detail.to_dict())
+        self.redis.hmset(detail.detail_key,detail.to_dict(redis_format=True))
         self.redis.sadd('changed_details',detail.detail_key)
 
     def get_proxy_by_address_and_port(self,address,port):

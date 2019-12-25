@@ -3,11 +3,15 @@ import json
 import re
 from IPython import embed
 import logging
-CWD = os.path.dirname(os.path.realpath(__file__))
+
+CONFIG_ENV = os.environ.get('AUTOPROXY_ENV','local')
+
+CUR_DIR, _ = os.path.split(__file__)
+CONFIG_DIR = os.path.join(CUR_DIR,'config')
 #logging.basicConfig(filename='%s/log/api.log' % CWD, format='%(asctime)s - %(message)s', level=logging.INFO)
 
 class ConfigReader(dict):
-    def __init__(self,config_dir=CWD, file_regex=r'([^\.]+)\.json'):
+    def __init__(self,config_dir=CONFIG_DIR, file_regex=r'([^\.]+)\.json'):
         #files = [f for f in os.listdir(config_dir) if re.match(file_regex, f)]
         #config_keys = [re.search(file_regex,f).group(1) for f in files]
 

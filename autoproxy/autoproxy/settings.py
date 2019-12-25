@@ -16,6 +16,12 @@ BOT_NAME = 'autoproxy'
 SPIDER_MODULES = ['autoproxy.spiders']
 NEWSPIDER_MODULE = 'autoproxy.spiders'
 
+import os
+import sys
+CWD = os.path.dirname(os.path.realpath(__file__))
+sys.path.append("%s/autoproxy/autoproxy_middleware" % CWD)
+
+
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'autoproxy (+http://www.yourdomain.com)'

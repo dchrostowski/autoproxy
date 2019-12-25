@@ -1,14 +1,16 @@
 version: '3'
 services:
-  web:
+  scrapyd:
     build:
       context: .
-      dockerfile: ./Dockerfile
+      dockerfile: scrapyd/Dockerfile
     ports:
       - "6800:6800"
     depends_on:
       - db
       - redis
+    env_file: 
+      - ./scrapyd.env
   redis:
     image: "redis:alpine"
     ports:
@@ -34,6 +36,8 @@ services:
   spider_scheduler:
     build:
       context: .
-      dockerfile: Dockerfile-spider-scheduler
+      dockerfile: scheduler/Dockerfile
+    env_file: 
+      - ./scrapyd.env
     depends_on:
-      - web
+      - scrapyd

@@ -102,7 +102,7 @@
     },
 
     "scrapyd_api_endpoint": {
-        "value": "http://web:6800",
+        "value": "http://scrapyd:6800",
         "description": "URL used to access the scrapyd API"
     },
 
