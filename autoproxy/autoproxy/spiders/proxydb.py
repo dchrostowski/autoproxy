@@ -6,8 +6,8 @@ import logging
 from IPython import embed
 import re
 from py_mini_racer import py_mini_racer
-from proxy_objects import Proxy
-from storage_manager import StorageManager
+from autoproxy.autoproxy_middleware.proxy_objects import Proxy
+from autoproxy.autoproxy_middleware.storage_manager import StorageManager
 
 ctx = py_mini_racer.MiniRacer()
 ctx.eval(" var atob = (arg) => arg ")

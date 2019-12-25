@@ -8,9 +8,9 @@
 from scrapy import signals
 from IPython import embed
 
-from proxy_manager import ProxyManager
-from exception_manager import ExceptionManager
-from util import parse_domain
+from autoproxy.autoproxy_middleware.proxy_manager import ProxyManager
+from autoproxy.autoproxy_middleware.exception_manager import ExceptionManager
+from autoproxy.autoproxy_middleware.util import parse_domain
 import sys
 import logging
 import twisted

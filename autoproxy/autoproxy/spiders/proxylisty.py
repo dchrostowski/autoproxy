@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import scrapy
-from storage_manager import StorageManager
-from proxy_objects import Proxy
+from autoproxy.autoproxy_middleware.storage_manager import StorageManager
+from autoproxy.autoproxy_middleware.proxy_objects import Proxy
 import sys
 import logging
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)

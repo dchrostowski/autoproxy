@@ -5,8 +5,8 @@ import logging
 from IPython import embed
 import re
 import json
-from proxy_objects import Proxy
-from storage_manager import StorageManager
+from autoproxy.autoproxy_middleware.proxy_objects import Proxy
+from autoproxy.autoproxy_middleware.storage_manager import StorageManager
 
 class IpAdressSpider(scrapy.Spider):
     name = 'ip-adress'

@@ -15,10 +15,10 @@ import traceback
 from psycopg2.extras import DictCursor
 from psycopg2 import sql
 from IPython import embed
-from proxy_objects import Proxy, Detail, Queue
-from util import parse_domain
+from autoproxy.autoproxy_middleware.proxy_objects import Proxy, Detail, Queue
+from autoproxy.autoproxy_middleware.util import parse_domain
 
-from autoproxy_config.config import configuration
+from autoproxy.autoproxy_middleware.config import configuration
 app_config = lambda config_val: configuration.app_config[config_val]['value']
 
 SEED_QUEUE_ID = app_config('seed_queue')

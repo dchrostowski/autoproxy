@@ -23,6 +23,9 @@ RUN pip3 install  --upgrade \
 		pip3  install -r requirements.txt && \
 		pip3 install --upgrade scrapyd
 
+RUN mkdir /code
+COPY ./autoproxy /code/autoproxy
+ENV PYTHONPATH=/code/autoproxy/autoproxy_middleware:$PYTHONPATH
 RUN mkdir /start
 ADD ./scrapyd/scrapyd.conf /etc/scrapyd/scrapyd.conf
 ADD ./scrapyd/nginx.conf /etc/nginx/sites-enabled/default

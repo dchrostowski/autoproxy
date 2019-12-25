@@ -7,8 +7,8 @@ import re
 import sys
 import logging
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
-from autoproxy_config.config import configuration
-from util import format_redis_boolean, format_redis_timestamp, parse_boolean, parse_timestamp
+from autoproxy.autoproxy_middleware.config import configuration
+from autoproxy.autoproxy_middleware.util import format_redis_boolean, format_redis_timestamp, parse_boolean, parse_timestamp
 # 1/1/2000
 DEFAULT_TIMESTAMP = datetime.fromtimestamp(946684800)
 BOOLEAN_VALS = (True,'1',False,'0')

@@ -19,7 +19,7 @@ NEWSPIDER_MODULE = 'autoproxy.spiders'
 import os
 import sys
 CWD = os.path.dirname(os.path.realpath(__file__))
-sys.path.append("%s/autoproxy_middleware" %CWD)
+sys.path.append("%s/autoproxy/autoproxy_middleware" % CWD)
 
 
 

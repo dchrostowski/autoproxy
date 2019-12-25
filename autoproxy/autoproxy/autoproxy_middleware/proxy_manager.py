@@ -1,7 +1,7 @@
-from util import parse_domain, flip_coin
-from storage_manager import StorageManager, RedisDetailQueue
-from autoproxy_config.config import configuration
-from proxy_objects import ProxyObject
+from autoproxy.autoproxy_middleware.util import parse_domain, flip_coin
+from autoproxy.autoproxy_middleware.storage_manager import StorageManager, RedisDetailQueue
+from autoproxy.autoproxy_middleware.config import configuration
+from autoproxy.autoproxy_middleware.proxy_objects import ProxyObject
 from datetime import datetime
 import sys
 import logging
