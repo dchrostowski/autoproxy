@@ -7,5 +7,4 @@ setup(
     version      = '1.0',
     packages     = find_packages(),
     entry_points = {'scrapy': ['settings = autoproxy.settings']},
-    include_package_data = True
 )

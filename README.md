@@ -23,13 +23,13 @@ I'm still working on this, but here's how to run it:
 ```
 git clone https://github.com/dchrostowski/autoproxy.git
 cd autoproxy
-docker-compose build
-docker-compose up
+sh ./start.sh
 ```
 
-There is a service calld proxy_scheduler (`src/proxy_scheduler.py`) which will automatically schedule crawling jobs using scrapyd. Open a browser and go to `http://localhost:6800/jobs` to get an idea of what's going on.  More information on scrapyd is available at `https://scrapyd.readthedocs.io/en/latest/`.
+To stop I'd highly recommend opening another terminal and running `sh ./stop.sh` because it forcefully removes and stops the scrapyd service which currently doesn't shutdown cleanly and may cause problems when trying to bring up the containers again.
 
 
+There is a service calld proxy_scheduler (see `/scheduler/proxy_scheduler.py`) which will automatically deploy spiders to the scrapyd service and then schedule jobs. scrapyd comes with a minimal web interace which can be viewed by opening `http://localhost:6800/jobs` (defualt username is `scrapy` and the default password is `foobar`) More information on scrapyd is available at `https://scrapyd.readthedocs.io/en/latest/`.
 
 ### Conceptual Model
 This system incorporates an object-oriented design approach to catalog proxies.  The three critical classes are `Proxy`, `Queue`, and `Detail`.  The `Proxy` class simply contains a static representation of an IP address, port, and protocol of a public proxy server.  The `Queue` class is used to represent a target web resource to scrape.  The `Detail` class contains proxy data which is continually updated for a given `Proxy` and `Queue`.  The purpose for each of these classes are documented in detail below.
@@ -81,37 +81,20 @@ detail = Detail(proxy_id=1,queue_id=2)
 ```
 ### Other classes
 #### ProxyObject
-To do
+placeholder
 #### StorageManager
-To do
+placeholder
 #### PostgresManager
-To do
+placeholder
 #### RedisManager
-To do
+placeholder
 #### ProxyManager
-to do
+placeholder
 
 ### Database
 
-To manually sync the redis cache with the database there are two options:
-#### Option 1
-Open a browser and go to `http://localhost:5000/sync_to_db`
-
-#### Option 2
-Invoke the `sync_to_db()` method in the StorageManager class.  Below is a simple example:
-1. Get a bash shell inside the web docker container and open the Python interpretter:
+To access the Postgres database, you can run the following:
 ```
-docker exec -it autoproxy3_web_1 /bin/bash
-python3
+docker exec -it autoproxy_db psql -U postgres proxies
 ```
-2. In the python interpretter type the following:
-```
-from storage_manager import StorageManager
-storage_mgr = StorageManager()
-storage_mgr.sync_to_db()
-```
-This will insert/update any new proxies/statistics and then flush the redis cache.
-
-
-
-
+The default password is `somepassword`

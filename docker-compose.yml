@@ -10,7 +10,7 @@ services:
       - db
       - redis
     env_file: 
-      - ./scrapyd/scrapyd.env
+      - ./scrapyd.env
   redis:
     image: "redis:alpine"
     ports:
@@ -37,5 +37,7 @@ services:
     build:
       context: .
       dockerfile: scheduler/Dockerfile
+    env_file: 
+      - ./scrapyd.env
     depends_on:
       - scrapyd

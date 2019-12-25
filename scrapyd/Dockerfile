@@ -24,13 +24,13 @@ RUN pip3 install  --upgrade \
 		pip3 install --upgrade scrapyd
 
 RUN mkdir /code
-COPY ./autoproxy /code/autoproxy
-ENV PYTHONPATH=/code/autoproxy/autoproxy_middleware:$PYTHONPATH
+COPY ./autoproxy_package /code/autoproxy_package
+RUN cd /code/autoproxy_package && python3 setup.py build && python3 setup.py install
 RUN mkdir /start
 ADD ./scrapyd/scrapyd.conf /etc/scrapyd/scrapyd.conf
 ADD ./scrapyd/nginx.conf /etc/nginx/sites-enabled/default
 ADD ./scrapyd/start_scrapyd.sh /start/start_scrapyd.sh
-ADD ./scrapyd/scrapyd.env /start/scrapyd.env
+ADD ./scrapyd.env /start/scrapyd.env
 RUN chmod +x /start/start_scrapyd.sh
 
 ENV AUTOPROXY_ENV=docker

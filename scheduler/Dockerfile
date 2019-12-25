@@ -2,13 +2,11 @@ FROM python:3
 RUN mkdir /scheduler
 RUN mkdir /code
 COPY ./autoproxy /code/autoproxy
-RUN ls /code/autoproxy
+COPY ./autoproxy_package /code/autoproxy_package
 COPY ./scheduler /scheduler
 #RUN python3 -m pip install --upgrade pip
 RUN python3 -m pip install -r /scheduler/requirements.txt
-RUN python3 -m pip install -r /code/autoproxy/requirements.txt
 RUN pip install git+https://github.com/scrapy/scrapyd-client
-ENV AUTOPROXY_ENV='docker'
-ENV PYTHONPATH="${PYTHONPATH}:/code/autoproxy/autoproxy_middleware"
-
-ENTRYPOINT ["python3", "/scheduler/foo.py"]
+RUN cd /code/autoproxy_package && python3 setup.py build && python3 setup.py install
+WORKDIR /code/autoproxy
+ENTRYPOINT scrapyd-client deploy scrapyd && python3 /scheduler/spider_scheduler.py
