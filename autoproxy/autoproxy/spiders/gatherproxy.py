@@ -22,7 +22,7 @@ class GatherproxySpider(scrapy.Spider):
 
     def start_requests(self):
         for i in range(self.count):
-            request = scrapy.Request(url='http://gatherproxy.com', dont_filter=True)
+            request = scrapy.Request(url='http://www.gatherproxy.com/proxylistbycountry', dont_filter=True)
             logging.info("GET %s" % request.url)
             yield request
 
@@ -41,7 +41,7 @@ class GatherproxySpider(scrapy.Spider):
         ----------------""" % (proxy.address, proxy.port)
         logging.info(log_str)
 
-    def parse(self, response):
+    def parse_list(self, response):
         script_elements = response.xpath('//script[contains(text(),"insertPrx")]').extract()
         proxies = []
         for script_text in script_elements:
@@ -51,4 +51,11 @@ class GatherproxySpider(scrapy.Spider):
         
         for proxy in proxies:
             self.log_proxy_info(proxy)
+
+    def parse(self,response):
+        links = response.xpath('//ul[@class="pc-list"]/li/a/@href').extract()
+
+        for link in links:
+            url = response.urljoin(link)
+            yield scrapy.Request(url=url,callback=self.parse_list, dont_filter=True)
             
