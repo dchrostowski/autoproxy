@@ -44,6 +44,6 @@ class ProxylistySpider(scrapy.Spider):
         
         next_link = response.xpath('//div[@id="content"]//table[1]/tr/td[@colspan="9"]/ul/li/a[text()="Next"]/@href').extract_first()
         if next_link is not None:
-            yield scrapy.Request(url=response.urljoin(next_link,dont_filter=True),callback=self.parse)
+            yield scrapy.Request(url=response.urljoin(next_link),callback=self.parse,dont_filter=True)
             
             
