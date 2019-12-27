@@ -1,4 +1,4 @@
-FROM python:3
+FROM python:3.7
 RUN mkdir /scheduler
 RUN mkdir /code
 COPY ./autoproxy /code/autoproxy
