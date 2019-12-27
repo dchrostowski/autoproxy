@@ -172,7 +172,6 @@ class PostgresManager(object):
         
         return active + inactive
 
-    # TO DO
     def get_non_seed_details(self):
         query= """
             SELECT * FROM details 

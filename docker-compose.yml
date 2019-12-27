@@ -11,8 +11,10 @@ services:
       - redis
     env_file: 
       - ./scrapyd.env
+    container_name: "autoproxy_scrapyd"
   redis:
     image: "redis:alpine"
+    command: redis-server --requirepass somepassword
     ports:
       - "5379:6379"
     container_name: "autoproxy_redis"
@@ -41,3 +43,4 @@ services:
       - ./scrapyd.env
     depends_on:
       - scrapyd
+    container_name: autoproxy_scheduler
