@@ -107,7 +107,7 @@
     },
 
     "scrapyd_max_jobs_per_spider": {
-        "value": 4,
+        "value": 1,
         "description":  "how many instances of each spider may be enqueued at once"
     },
 
