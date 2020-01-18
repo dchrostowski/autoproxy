@@ -19,9 +19,6 @@ logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
-proxy_mgr = ProxyManager()
-exception_mgr = ExceptionManager()
-
 class AutoproxySpiderMiddleware(object):
     # Not all methods need to be defined. If a method is not defined,
     # scrapy acts as if the spider middleware does not modify the
@@ -75,6 +72,10 @@ class AutoproxyDownloaderMiddleware(object):
     # scrapy acts as if the downloader middleware does not modify the
     # passed objects.
 
+    def __init__(self,*args,**kwargs):
+        self.proxy_mgr = ProxyManager()
+        self.exception_mgr = ExceptionManager()
+
     @classmethod
     def from_crawler(cls, crawler):
         # This method is used by Scrapy to create your spiders.
@@ -87,7 +88,7 @@ class AutoproxyDownloaderMiddleware(object):
         # middleware.
         
         spider.logger.info("processing request for %s" % request.url)
-        proxy = proxy_mgr.get_proxy(request.url)
+        proxy = self.proxy_mgr.get_proxy(request.url)
         logger.info("using proxy %s" % proxy.urlify())
         request.meta['proxy'] = proxy.urlify()
         request.meta['proxy_obj'] = proxy
@@ -150,9 +151,9 @@ class AutoproxyDownloaderMiddleware(object):
             logger.warn("no proxy object found in request.meta")
 
         
-        if exception_mgr.is_defective_proxy(exception):
+        if self.exception_mgr.is_defective_proxy(exception):
             proxy.callback(success=False)
-            proxy = proxy_mgr.get_proxy(request.url)
+            proxy = self.proxy_mgr.get_proxy(request.url)
             request.meta['proxy'] = proxy.urlify()
             request.meta['proxy_obj'] = proxy
             return request

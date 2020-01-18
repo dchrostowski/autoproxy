@@ -64,33 +64,23 @@
     },
 
     "sync_interval": {
-        "value": 1000,
+        "value": 250,
         "description": "How many seconds between syncing cache with database"
     },
 
     "active_proxies_per_queue": {
-        "value": 200,
+        "value": 500,
         "description": "The max number of active proxies to be loaded into memory per sync interval order by last_used descending"
     },
 
     "inactive_proxies_per_queue": {
-        "value": 100,
+        "value": 500,
         "descripton": "The number of inactive proxies to be loaded into memory per sync interval"
     },
 
     "seed_proxies_per_queue": {
         "value": 200,
         "description": "The number of new proxies to try out"
-    },
-
-    "redis_proxy_char": {
-        "value": "p"
-    },
-    "redis_detail_char": {
-        "value": "d"
-    },
-    "redis_queue_char": {
-        "value": "q"
     },
 
     "overrides": {

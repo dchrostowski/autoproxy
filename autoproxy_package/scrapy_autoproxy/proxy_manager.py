@@ -10,9 +10,6 @@ from IPython import embed
 
 app_config = lambda config_val: configuration.app_config[config_val]['value']
 
-QUEUE_PREFIX = app_config('redis_queue_char')
-PROXY_PREFIX = app_config('redis_proxy_char')
-DETAIL_PREFIX = app_config('redis_detail_char')
 BLACKLIST_THRESHOLD = app_config('blacklist_threshold')
 DECREMENT_BLACKLIST = app_config('decrement_blacklist')
 MAX_BLACKLIST_COUNT = app_config('max_blacklist_count')
@@ -82,10 +79,7 @@ class ProxyManager(object):
 
 
         if rdq_active.length() < MIN_ACTIVE:
-            if flip_coin(INACTIVE_PCT):
-                use_active = True
-            else:
-                use_active = False
+            use_active=False
             
         
         elif flip_coin(INACTIVE_PCT):

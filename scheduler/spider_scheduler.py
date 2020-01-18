@@ -129,7 +129,7 @@ class SpiderScheduler(object):
                 time.sleep(5)
 
         if daemon_status['status'] == 'ok':
-            self.start_time = datetime.datetime.now()
+            self.start_time = datetime.datetime.utcnow()
             self.allow_new_jobs = True
             project_list = ScrapydApi.list_projects()
             self.project_spiders = {}
@@ -242,7 +242,7 @@ if __name__ == "__main__":
         storage_mgr = StorageManager()
         storage_mgr.sync_to_db()
         logging.info("SYNC COMPLETE")
-        now = datetime.datetime.now()
+        now = datetime.datetime.utcnow()
         scheduler.start_time = now
         scheduler.allow_new_jobs = True
         
@@ -255,7 +255,7 @@ if __name__ == "__main__":
                 logging.info("enqueueing task to schedule %s" % spider)
                 tq.enqueue(Task(**spider,fn=schedule_spider))
         
-        now = datetime.datetime.now()
+        now = datetime.datetime.utcnow()
         start = scheduler.start_time
         elapsed = now - start
         logging.info("elapsed time since last sync: %s" % elapsed.seconds)

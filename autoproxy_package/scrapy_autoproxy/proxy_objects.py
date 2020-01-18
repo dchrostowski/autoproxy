@@ -15,9 +15,6 @@ BOOLEAN_VALS = (True,'1',False,'0')
 app_config = lambda config_val: configuration.app_config[config_val]['value']
 
 
-QUEUE_PREFIX = app_config('redis_queue_char')
-PROXY_PREFIX = app_config('redis_proxy_char')
-DETAIL_PREFIX = app_config('redis_detail_char')
 BLACKLIST_THRESHOLD = app_config('blacklist_threshold')
 DECREMENT_BLACKLIST = app_config('decrement_blacklist')
 MAX_BLACKLIST_COUNT = app_config('max_blacklist_count')
@@ -52,7 +49,7 @@ class Proxy(object):
     @property
     def proxy_key(self):
         if self._proxy_key is None and self.proxy_id is not None:
-            self._proxy_key = "%s_%s" % (PROXY_PREFIX,self.proxy_id)
+            self._proxy_key = "%s_%s" % ('p',self.proxy_id)
         return self._proxy_key
         
     @proxy_key.setter
@@ -101,7 +98,7 @@ class Detail(object):
     @property
     def proxy_key(self):
         if self.proxy_id is not None:
-            self._proxy_key = "%s_%s" % (PROXY_PREFIX,self.proxy_id)
+            self._proxy_key = "%s_%s" % ("p",self.proxy_id)
         return self._proxy_key
         
     
@@ -112,7 +109,7 @@ class Detail(object):
     @property
     def queue_key(self):
         if self.queue_id is not None:
-            self._queue_key = "%s_%s" % (QUEUE_PREFIX,self.queue_id)
+            self._queue_key = "%s_%s" % ('q',self.queue_id)
         return self._queue_key
             
     @queue_key.setter
@@ -121,7 +118,7 @@ class Detail(object):
 
     @property
     def detail_key(self):
-        return "%s_%s_%s" % (DETAIL_PREFIX,self.queue_key,self.proxy_key)
+        return "%s_%s_%s" % ('d',self.queue_key,self.proxy_key)
 
 
 
@@ -259,7 +256,7 @@ class ProxyObject(Proxy):
                          self.proxy.protocol, self.proxy.proxy_id)
 
     def dispatch(self, active_queue,inactive_queue):
-        self._dispatch_time = datetime.now()
+        self._dispatch_time = datetime.utcnow()
         self._active_queue = active_queue
         self._inactive_queue = inactive_queue
         logging.info("proxy stats:")
@@ -275,7 +272,7 @@ class ProxyObject(Proxy):
         if self._dispatch_time is None or (requeue and (self._active_queue is None or self._inactive_queue is None)):
             raise Exception("Proxy not properly dispatched prior to callback.")
 
-        self.detail.last_used = datetime.now()
+        self.detail.last_used = datetime.utcnow()
         return_queue = None
 
         if success is None:
@@ -292,10 +289,10 @@ class ProxyObject(Proxy):
         elif success:
             logging.info("proxy callback(success=True)")
             return_queue = self._active_queue
-            load_time_delta = datetime.now() - self._dispatch_time
+            load_time_delta = datetime.utcnow() - self._dispatch_time
             self.detail.load_time = int(load_time_delta.microseconds/1000)
             self.detail.active = True
-            self.detail.last_active = datetime.now()
+            self.detail.last_active = datetime.utcnow()
             #self.detail.decrement_bad_count()
             self.detail.lifetime_good += 1
             if DECREMENT_BLACKLIST:
