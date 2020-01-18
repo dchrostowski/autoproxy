@@ -69,7 +69,7 @@
     },
 
     "active_proxies_per_queue": {
-        "value": 500,
+        "value": 50,
         "description": "The max number of active proxies to be loaded into memory per sync interval order by last_used descending"
     },
 

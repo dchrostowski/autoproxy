@@ -76,7 +76,6 @@ class ScrapydApi(object):
     def daemon_status():
         url = ScrapydApi.url('daemonstatus.json')
         resp = requests.get(url, auth=ScrapydApi.auth())
-        embed()
         return resp.json()
 
     @staticmethod
@@ -129,7 +128,7 @@ class SpiderScheduler(object):
                 time.sleep(5)
 
         if daemon_status['status'] == 'ok':
-            self.start_time = datetime.datetime.utcnow()
+            self.start_time = datetime.datetime.now()
             self.allow_new_jobs = True
             project_list = ScrapydApi.list_projects()
             self.project_spiders = {}
@@ -242,7 +241,7 @@ if __name__ == "__main__":
         storage_mgr = StorageManager()
         storage_mgr.sync_to_db()
         logging.info("SYNC COMPLETE")
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now()
         scheduler.start_time = now
         scheduler.allow_new_jobs = True
         
@@ -255,7 +254,7 @@ if __name__ == "__main__":
                 logging.info("enqueueing task to schedule %s" % spider)
                 tq.enqueue(Task(**spider,fn=schedule_spider))
         
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now()
         start = scheduler.start_time
         elapsed = now - start
         logging.info("elapsed time since last sync: %s" % elapsed.seconds)

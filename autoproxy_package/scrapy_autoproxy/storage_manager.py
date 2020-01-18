@@ -38,7 +38,7 @@ MAX_BLACKLIST_COUNT = app_config('max_blacklist_count')
 BLACKLIST_TIME = app_config('blacklist_time')
 MAX_DB_CONNECT_ATTEMPTS = app_config('max_db_connect_attempts')
 DB_CONNECT_ATTEMPT_INTERVAL = app_config("db_connect_attempt_interval")
-PROXY_INTERVAL = app_config("proxy_interval")
+
 
 # decorator for RedisManager methods
 def block_if_syncing(func):
@@ -335,11 +335,13 @@ class RedisDetailQueue(object):
         
         if detail.active and not self.active:
             logging.warn("Attempting to enqueue an active detail into an inactive queue")
-            self.new(self.queue_key, not self.active).enqueue(detail)
+            correct_queue = self.new(self.queue_key, not self.active)
+            correct_queue.enqueue(detail)
             return
         elif not detail.active and self.active:
             logging.warn("Attempting to enqueue an inactive detail into an active queue")
-            self.new(self.queue_key, not self.active).enqueue(detail)
+            correct_queue = self.new(self.queue_key, not self.active)
+            correct_queue.enqueue(detail)
             return
         self.redis.rpush(self.redis_key,detail_key)
 
@@ -349,11 +351,6 @@ class RedisDetailQueue(object):
         if self.is_empty():
             raise RedisDetailQueueEmpty("No proxies available for queue key %s" % self.queue_key)
         detail = Detail(**self.redis.hgetall(self.redis.lpop(self.redis_key)))
-        elapsed_time =  datetime.utcnow() - detail.last_used
-        if elapsed_time.seconds < PROXY_INTERVAL:
-            logging.warn("Proxy was last used %s seconds ago, using a different proxy." % elapsed_time)
-            self.enqueue(detail)
-            return self.dequeue(requeue=requeue)
 
         if requeue:
             self.enqueue(detail)

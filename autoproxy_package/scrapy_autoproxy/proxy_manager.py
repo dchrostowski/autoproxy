@@ -21,7 +21,7 @@ ACTIVE_PROXIES_PER_QUEUE = app_config('active_proxies_per_queue')
 INACTIVE_PROXIES_PER_QUEUE = app_config('inactive_proxies_per_queue')
 SEED_PROXIES_PER_QUEUE = app_config('seed_proxies_per_queue')
 SEED_QUEUE_ID = app_config('seed_queue')
-
+PROXY_INTERVAL = app_config("proxy_interval")
 
 
 
@@ -54,7 +54,7 @@ class ProxyManager(object):
             inactive_target_rdq.enqueue(new_detail)
         for i in range(inactive_seeds_to_dequeue):
             new_detail = self.storage_mgr.clone_detail(inactive_seed_rdq.dequeue(), target_queue)
-            inactive_target_rdq.enqueue(new_detail)        
+            inactive_target_rdq.enqueue(new_detail)  
         
 
     def get_proxy(self,request_url):
@@ -94,10 +94,18 @@ class ProxyManager(object):
             self.logger.info("using inactive queue")
             draw_queue = rdq_inactive
         
-        detail = None
-        
+        logging.info("proxy-manager got draw queue")
         detail = draw_queue.dequeue(requeue=False)
+
+        elapsed_time =  datetime.utcnow() - detail.last_used
+        if elapsed_time.seconds < PROXY_INTERVAL:
+            while elapsed_time.seconds < PROXY_INTERVAL:
+                logging.warn("Proxy was last used %s seconds ago, using a different proxy." % elapsed_time.seconds)
+                detail = draw_queue.dequeue(requeue=False)
+                elapsed_time = datetime.utcnow()  - detail.last_used
+        
         proxy = ProxyObject(self.storage_mgr, detail)
+        
         while 'socks' in proxy.protocol:
             detail = draw_queue.dequeue(requeue=False)
             proxy = ProxyObject(self.storage_mgr, detail)
