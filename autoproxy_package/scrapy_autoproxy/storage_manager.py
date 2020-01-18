@@ -319,7 +319,6 @@ class RedisDetailQueue(object):
             return False
 
     def enqueue(self,detail):
-        logging.info("enqueue called")
         
         
         self._update_blacklist_status(detail)
