@@ -269,6 +269,7 @@ class ProxyObject(Proxy):
         logging.info("----------------------------------------------")
 
     def callback(self, success,requeue=True):
+        logging.info("callback called")
         if self._dispatch_time is None or (requeue and (self._active_queue is None or self._inactive_queue is None)):
             raise Exception("Proxy not properly dispatched prior to callback.")
 

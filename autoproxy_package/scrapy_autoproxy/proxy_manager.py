@@ -102,7 +102,10 @@ class ProxyManager(object):
             self.load_seeds(target_queue=queue)
             detail = draw_queue.dequeue(requeue=False)
 
-
+        logging.info("check datetime.utcnow()")
+        logging.info(datetime.utcnow())
+        logging.info("check detail.last_used")
+        logging.info(detail.last_used)
         elapsed_time =  datetime.utcnow() - detail.last_used
         if elapsed_time.seconds < PROXY_INTERVAL:
             while elapsed_time.seconds < PROXY_INTERVAL:

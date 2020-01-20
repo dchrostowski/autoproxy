@@ -422,6 +422,9 @@ class RedisManager(object):
         logging.info("got %s proxy details from database." % len(other_details))
         logging.info("registering proxy details...")
         for d in other_details:
+            logging.info("about to register detail, check last used vs datetime.utcnow():")
+            logging.info("last used: %s" % d.last_used)
+            logging.info("datetime.utcnow(): %s " % datetime.utcnow())
             self.register_detail(d)
         logging.info("registerd proxy details.")
         logging.info("sync complete.")
