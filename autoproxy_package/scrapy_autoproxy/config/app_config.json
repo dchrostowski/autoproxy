@@ -68,6 +68,10 @@
         "description": "How many seconds between syncing cache with database"
     },
 
+    "initial_seed_count": {
+        "value": 300
+    },
+
     "active_proxies_per_queue": {
         "value": 100,
         "description": "The max number of active proxies to be loaded into memory per sync interval order by last_used descending"

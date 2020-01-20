@@ -31,13 +31,21 @@ class ProxyManager(object):
 
     def clone_seeds(self,target_queue):
         seed_queue = self.storage_mgr.get_seed_queue()
-        seed_details = self.storage_mgr.redis_mgr.get_all_queue_details(seed_queue.queue_key)
+        seed_rdq_active = RedisDetailQueue(seed_queue.queue_key,active=True)
+        seed_rdq_inactive = RedisDetailQueue(seed_queue.queue_key, active=False)
 
-        for seed_detail in seed_details:
-            self.storage_mgr.clone_detail(seed_detail, target_queue)
+        active_i = min(seed_rdq_active.length(),ACTIVE_PROXIES_PER_QUEUE)
+        inactive_i = min(seed_rdq_inactive.length(), INACTIVE_PROXIES_PER_QUEUE)
 
-    def dequeue_and_clone_seed(self,target_queue):
-        seed_rdq = RedisDetailQueue(self.storage_mgr.get_seed_queue().queue_key, active=True)
+        for i in range(active_i):
+            self.dequeue_and_clone_seed(target_queue,active=True)
+        
+        for i in range(inactive_i):
+            self.dequeue_and_clone_seed(target_queue,active=False)
+
+
+    def dequeue_and_clone_seed(self,target_queue,active=True):
+        seed_rdq = RedisDetailQueue(self.storage_mgr.get_seed_queue().queue_key, active=active)
         seed = seed_rdq.dequeue(requeue=True)
         cloned = self.storage_mgr.clone_detail(seed,target_queue)
         return cloned
@@ -46,6 +54,16 @@ class ProxyManager(object):
     def get_proxy(self,request_url):
         domain = parse_domain(request_url)
         queue = self.storage_mgr.redis_mgr.get_queue_by_domain(domain)
+        if len(self.storage_mgr.redis_mgr.get_all_queue_details(queue.queue_key)) == 0:
+            seed_details = self.storage_mgr.db_mgr.get_non_seed_details(queue.queue_id)
+            if len(seed_details) == 0:
+                self.clone_seeds(queue)
+            
+            else:
+                for seed_detail in seed_details:
+                    self.storage_mgr.redis_mgr.register_detail(seed_detail)
+
+        
         
         rdq_active = RedisDetailQueue(queue_key=queue.queue_key,active=True)
         rdq_inactive = RedisDetailQueue(queue_key=queue.queue_key,active=False)
@@ -59,8 +77,9 @@ class ProxyManager(object):
                 
 
         if rdq_inactive.length() < MIN_QUEUE_SIZE:
+            rdq_inactive.clear()
             self.clone_seeds(target_queue=queue)
-            rdq_inactive.reload()
+            
 
         if rdq_active.length() < MIN_QUEUE_SIZE:
             use_active=False
@@ -90,7 +109,7 @@ class ProxyManager(object):
         now = datetime.utcnow()
         elapsed_time = now - detail.last_used
         if elapsed_time.seconds < PROXY_INTERVAL:
-            while elapsed_time.seconds < PROXY_INTERVAL and draw_queue.length() > 1:
+            while elapsed_time.seconds < PROXY_INTERVAL and draw_queue.length() > MIN_QUEUE_SIZE:
                 logging.debug("draw queue key: %s, active: %s" % (draw_queue.queue_key, draw_queue.active))
                 logging.warn("Proxy id %s was last used %s seconds ago, using a different proxy." % (detail.proxy_id, elapsed_time.seconds))
                 detail = draw_queue.dequeue(requeue=False)

@@ -40,6 +40,7 @@ DB_CONNECT_ATTEMPT_INTERVAL = app_config("db_connect_attempt_interval")
 PROXY_INTERVAL = app_config('proxy_interval')
 LAST_USED_CUTOFF = datetime.utcnow() - timedelta(seconds=PROXY_INTERVAL)
 NEW_DETAILS_SET_KEY = 'new_details'
+INITIAL_SEED_COUNT = app_config('initial_seed_count')
 
 
 
@@ -168,8 +169,8 @@ class PostgresManager(object):
             ORDER BY last_used ASC
             LIMIT %(limit)s;
             """
-        a_params = {"queue_id":SEED_QUEUE_ID, "active":True,"limit": ACTIVE_LIMIT}
-        ia_params = {"queue_id":SEED_QUEUE_ID, "active":False,"limit": INACTIVE_LIMIT}
+        a_params = {"queue_id":SEED_QUEUE_ID, "active":True,"limit": INITIAL_SEED_COUNT}
+        ia_params = {"queue_id":SEED_QUEUE_ID, "active":False,"limit": INITIAL_SEED_COUNT}
         a_params['last_used_cutoff'] = LAST_USED_CUTOFF
         ia_params['last_used_cutoff'] = LAST_USED_CUTOFF
         active =  [Detail(**d) for d in self.do_query(query,a_params)]
@@ -178,6 +179,8 @@ class PostgresManager(object):
         return active + inactive
 
     def get_non_seed_details(self,queue_id):
+        if queue_id is None:
+            return []
         query= """
             SELECT * FROM details 
             WHERE queue_id = %(queue_id)s
@@ -303,6 +306,9 @@ class RedisDetailQueue(object):
             active_clause = "inactive"
         self.redis_key = 'redis_%s_detail_queue_%s' % (active_clause, queue_key)
 
+        if self.length() == 0:
+            self.reload()
+
     def reload(self):
         details = self.redis_mgr.get_all_queue_details(self.queue_key)
         self.clear()
@@ -414,6 +420,7 @@ class RedisManager(object):
 
         for q in queues:
             self.register_queue(q)
+
         logging.info("fetching proxies from database...")
         proxies = self.dbh.get_proxies()
         logging.info("got %s proxies from database." % len(proxies))
@@ -430,9 +437,10 @@ class RedisManager(object):
         for d in seed_details:
             self.register_detail(d)
         logging.info("registered seed details.")
-        logging.info("fetching non-seed details from database...")
+        #logging.info("fetching non-seed details from database...")
 
-        other_details = []
+        #other_details = []
+        """
         for q in queues:
             logging.info("queue id %s" % q.queue_id)
             if q.queue_id != SEED_QUEUE_ID and q.queue_id != AGGREGATE_QUEUE_ID:
@@ -445,6 +453,7 @@ class RedisManager(object):
         for d in other_details:
             self.register_detail(d)
         logging.info("registerd proxy details.")
+        """
         logging.info("sync complete.")
     
     @block_if_syncing
@@ -491,14 +500,7 @@ class RedisManager(object):
         
         relational_keys = {'proxy_key': detail.proxy_key, 'queue_key': detail.queue_key}
         self.redis.hmset(detail_key, relational_keys)
-        active_rdq = RedisDetailQueue(detail.queue_key,active=True)
-        inactive_rdq = RedisDetailQueue(detail.queue_key,active=False)
-
-        if detail.active:
-            active_rdq.enqueue(detail)
-        else:
-            inactive_rdq.enqueue(detail)
-
+        
         return Detail(**self.redis.hgetall(detail_key))
 
     @block_if_syncing
