@@ -21,7 +21,7 @@ ACTIVE_PROXIES_PER_QUEUE = app_config('active_proxies_per_queue')
 INACTIVE_PROXIES_PER_QUEUE = app_config('inactive_proxies_per_queue')
 SEED_PROXIES_PER_QUEUE = app_config('seed_proxies_per_queue')
 SEED_QUEUE_ID = app_config('seed_queue')
-
+PROXY_INTERVAL = app_config('proxy_interval')
 
 
 
