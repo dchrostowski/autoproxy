@@ -13,10 +13,11 @@ def parse_domain(url):
     return domain
 
 def flip_coin(prob):
-    mark = prob * 100
-    result = random.random() * 100
-    if result < mark:
+    prob = prob * 100
+    result = random.randint(0,100)
+    if result < prob:
         return True
+    
     return False
 
 def format_redis_boolean(bool_val):

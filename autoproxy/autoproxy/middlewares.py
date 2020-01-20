@@ -5,6 +5,7 @@
 # See documentation in:
 # https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
+from scrapy.exceptions import IgnoreRequest
 from scrapy import signals
 from IPython import embed
 
@@ -88,6 +89,9 @@ class AutoproxyDownloaderMiddleware(object):
         # middleware.
         
         spider.logger.info("processing request for %s" % request.url)
+        if parse_domain(request.url) not in spider.allowed_domains:
+            raise IgnoreRequest("Bad domain, ignoring request.")
+        
         proxy = self.proxy_mgr.get_proxy(request.url)
         logger.info("using proxy %s" % proxy.urlify())
         request.meta['proxy'] = proxy.urlify()

@@ -19,12 +19,10 @@ BLACKLIST_THRESHOLD = app_config('blacklist_threshold')
 DECREMENT_BLACKLIST = app_config('decrement_blacklist')
 MAX_BLACKLIST_COUNT = app_config('max_blacklist_count')
 SEED_FREQUENCY =  app_config('seed_frequency')
-MIN_ACTIVE = app_config('min_active')
 INACTIVE_PCT = app_config('inactive_pct')
 SYNC_INTERVAL = app_config('sync_interval')
 ACTIVE_PROXIES_PER_QUEUE = app_config('active_proxies_per_queue')
 INACTIVE_PROXIES_PER_QUEUE = app_config('inactive_proxies_per_queue')
-SEED_PROXIES_PER_QUEUE = app_config('seed_proxies_per_queue')
 
 class Proxy(object):
     AVAILABLE_PROTOCOLS = ('http', 'https', 'socks5', 'socks4')
