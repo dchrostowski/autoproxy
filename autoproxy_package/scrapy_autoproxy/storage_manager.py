@@ -435,6 +435,13 @@ class RedisManager(object):
         for d in seed_details:
             self.register_detail(d)
         logging.info("registered seed details.")
+
+        seed_queue = self.get_seed_queue()
+        seed_rdq_active = RedisDetailQueue(seed_queue.queue_key,active=True)
+        seed_rdq_inactive = RedisDetailQueue(seed_queue.queue_key,active=False)
+
+        seed_rdq_active.reload()
+        seed_rdq_inactive.reload()
         #logging.info("fetching non-seed details from database...")
 
         #other_details = []
