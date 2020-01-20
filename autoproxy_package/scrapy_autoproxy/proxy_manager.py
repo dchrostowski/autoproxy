@@ -1,5 +1,5 @@
 from scrapy_autoproxy.util import parse_domain, flip_coin
-from scrapy_autoproxy.storage_manager import StorageManager, RedisDetailQueue, RedisDetailQueueEmpty
+from scrapy_autoproxy.storage_manager import StorageManager, RedisDetailQueue
 from scrapy_autoproxy.config import configuration
 from scrapy_autoproxy.proxy_objects import ProxyObject
 from datetime import datetime
@@ -21,7 +21,7 @@ ACTIVE_PROXIES_PER_QUEUE = app_config('active_proxies_per_queue')
 INACTIVE_PROXIES_PER_QUEUE = app_config('inactive_proxies_per_queue')
 SEED_PROXIES_PER_QUEUE = app_config('seed_proxies_per_queue')
 SEED_QUEUE_ID = app_config('seed_queue')
-PROXY_INTERVAL = app_config("proxy_interval")
+
 
 
 
@@ -94,32 +94,20 @@ class ProxyManager(object):
             self.logger.info("using inactive queue")
             draw_queue = rdq_inactive
         
-        logging.info("proxy-manager got draw queue")
-
-        try:
-            detail = draw_queue.dequeue(requeue=False)
-        except RedisDetailQueueEmpty:
-            self.load_seeds(target_queue=queue)
-            detail = draw_queue.dequeue(requeue=False)
-
-        logging.info("check datetime.utcnow()")
-        logging.info(datetime.utcnow())
-        logging.info("check detail.last_used")
-        logging.info(detail.last_used)
-        elapsed_time =  datetime.utcnow() - detail.last_used
+        
+        detail = draw_queue.dequeue(requeue=False)
+        now = datetime.utcnow()
+        elapsed_time = now - detail.last_used
         if elapsed_time.seconds < PROXY_INTERVAL:
             while elapsed_time.seconds < PROXY_INTERVAL:
                 logging.warn("Proxy was last used %s seconds ago, using a different proxy." % elapsed_time.seconds)
-                try:
-                    detail = draw_queue.dequeue(requeue=False)
-                except RedisDetailQueueEmpty:
-                    self.load_seeds(target_queue=queue)
-                    detail = draw_queue.dequeue(requeue=False)
-
-                elapsed_time = datetime.utcnow()  - detail.last_used
+                draw_queue.enqueue(detail)
+                detail = draw_queue.dequeue(requeue=False)
+                now  = datetime.utcnow()
+                elapsed_time = now  - detail.last_used
+        
         
         proxy = ProxyObject(self.storage_mgr, detail)
-
         while 'socks' in proxy.protocol:
             detail = draw_queue.dequeue(requeue=False)
             proxy = ProxyObject(self.storage_mgr, detail)
