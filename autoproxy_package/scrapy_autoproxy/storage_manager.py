@@ -441,7 +441,7 @@ class RedisManager(object):
         seed_rdq_inactive = RedisDetailQueue(seed_queue.queue_key,active=False)
 
         seed_rdq_active.reload()
-        seed_rdq_inactive.reload()s
+        seed_rdq_inactive.reload()
         #logging.info("fetching non-seed details from database...")
 
         #other_details = []
