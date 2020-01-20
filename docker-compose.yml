@@ -12,20 +12,12 @@ services:
     env_file: 
       - ./scrapyd.env
     container_name: "autoproxy_scrapyd"
-  redis-overcommit:
-    build: https://github.com/bkuhl/redis-overcommit-on-host.git
-    restart: 'no'
-    privileged: true
-    volumes:
-      - /proc/sys/vm:/mnt/vm
   redis:
     image: "redis:alpine"
     command: redis-server --requirepass somepassword
     ports:
       - "5379:6379"
     container_name: "autoproxy_redis"
-    depends_on:
-      - redis-overcommit
   db:
 #   Use the Docker Image postgres. This will pull the newest release.
     image: "postgres"
