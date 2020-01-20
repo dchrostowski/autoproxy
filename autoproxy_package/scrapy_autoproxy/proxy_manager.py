@@ -1,5 +1,5 @@
 from scrapy_autoproxy.util import parse_domain, flip_coin
-from scrapy_autoproxy.storage_manager import StorageManager, RedisDetailQueue
+from scrapy_autoproxy.storage_manager import StorageManager, RedisDetailQueue, RedisDetailQueueEmpty
 from scrapy_autoproxy.config import configuration
 from scrapy_autoproxy.proxy_objects import ProxyObject
 from datetime import datetime
@@ -95,17 +95,28 @@ class ProxyManager(object):
             draw_queue = rdq_inactive
         
         logging.info("proxy-manager got draw queue")
-        detail = draw_queue.dequeue(requeue=False)
+
+        try:
+            detail = draw_queue.dequeue(requeue=False)
+        except RedisDetailQueueEmpty:
+            self.load_seeds(target_queue=queue)
+            detail = draw_queue.dequeue(requeue=False)
+
 
         elapsed_time =  datetime.utcnow() - detail.last_used
         if elapsed_time.seconds < PROXY_INTERVAL:
             while elapsed_time.seconds < PROXY_INTERVAL:
                 logging.warn("Proxy was last used %s seconds ago, using a different proxy." % elapsed_time.seconds)
-                detail = draw_queue.dequeue(requeue=False)
+                try:
+                    detail = draw_queue.dequeue(requeue=False)
+                except RedisDetailQueueEmpty:
+                    self.load_seeds(target_queue=queue)
+                    detail = draw_queue.dequeue(requeue=False)
+
                 elapsed_time = datetime.utcnow()  - detail.last_used
         
         proxy = ProxyObject(self.storage_mgr, detail)
-        
+
         while 'socks' in proxy.protocol:
             detail = draw_queue.dequeue(requeue=False)
             proxy = ProxyObject(self.storage_mgr, detail)
