@@ -31,17 +31,13 @@ class ProxyManager(object):
 
     def clone_seeds(self,target_queue):
         seed_queue = self.storage_mgr.get_seed_queue()
-        seed_rdq_active = RedisDetailQueue(seed_queue.queue_key,active=True)
-        seed_rdq_inactive = RedisDetailQueue(seed_queue.queue_key, active=False)
-
-        active_i = min(seed_rdq_active.length(),ACTIVE_PROXIES_PER_QUEUE)
-        inactive_i = min(seed_rdq_inactive.length(), INACTIVE_PROXIES_PER_QUEUE)
-
-        for i in range(active_i):
-            self.dequeue_and_clone_seed(target_queue,active=True)
+        if target_queue.queue_id == seed_queue.queue_id:
+            raise Exception("CANNOT CLONE SEED TO SEED")
         
-        for i in range(inactive_i):
-            self.dequeue_and_clone_seed(target_queue,active=False)
+        seed_details = self.storage_mgr.redis_mgr.get_all_queue_details(seed_queue.queue_key)
+
+        for seed_detail in seed_details:
+            self.storage_mgr.clone_detail(seed_detail,target_queue)
 
         active_rdq = RedisDetailQueue(target_queue.queue_key,active=True)
         inactive_rdq = RedisDetailQueue(target_queue.queue_key,active=False)
@@ -82,7 +78,7 @@ class ProxyManager(object):
         
                 
 
-        if rdq_inactive.length() < MIN_QUEUE_SIZE:
+        if rdq_inactive.length() < MIN_QUEUE_SIZE and queue.queue_id != SEED_QUEUE_ID:
             rdq_inactive.clear()
             self.clone_seeds(target_queue=queue)
             

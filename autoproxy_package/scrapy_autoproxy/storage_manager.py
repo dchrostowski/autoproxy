@@ -306,14 +306,12 @@ class RedisDetailQueue(object):
             active_clause = "inactive"
         self.redis_key = 'redis_%s_detail_queue_%s' % (active_clause, queue_key)
 
-        if self.length() == 0:
-            self.reload()
-
     def reload(self):
         details = self.redis_mgr.get_all_queue_details(self.queue_key)
         self.clear()
         for detail in details:
-            self.enqueue(detail)
+            if detail.active == self.active:
+                self.enqueue(detail)
 
 
 
