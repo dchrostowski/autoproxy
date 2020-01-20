@@ -43,6 +43,12 @@ class ProxyManager(object):
         for i in range(inactive_i):
             self.dequeue_and_clone_seed(target_queue,active=False)
 
+        active_rdq = RedisDetailQueue(target_queue.queue_key,active=True)
+        inactive_rdq = RedisDetailQueue(target_queue.queue_key,active=False)
+
+        active_rdq.reload()
+        inactive_rdq.reload()
+
 
     def dequeue_and_clone_seed(self,target_queue,active=True):
         seed_rdq = RedisDetailQueue(self.storage_mgr.get_seed_queue().queue_key, active=active)
