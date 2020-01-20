@@ -71,7 +71,7 @@ class ProxyManager(object):
         use_active = True
         clone_seed = flip_coin(SEED_FREQUENCY)
 
-        if rdq_inactive.length() < 1:
+        if rdq_inactive.length() < MIN_ACTIVE:
             self.load_seeds(target_queue=queue)
 
         if clone_seed:
@@ -94,14 +94,15 @@ class ProxyManager(object):
             self.logger.info("using inactive queue")
             draw_queue = rdq_inactive
         
-        
+        detail = None
         detail = draw_queue.dequeue(requeue=False)
         now = datetime.utcnow()
         elapsed_time = now - detail.last_used
         if elapsed_time.seconds < PROXY_INTERVAL:
-            while elapsed_time.seconds < PROXY_INTERVAL:
-                logging.warn("Proxy was last used %s seconds ago, using a different proxy." % elapsed_time.seconds)
-                draw_queue.enqueue(detail)
+            while elapsed_time.seconds < PROXY_INTERVAL and draw_queue.length() > 1:
+                logging.debug("draw queue key: %s, active: %s" % (draw_queue.queue_key, draw_queue.active))
+                logging.warn("Proxy id %s was last used %s seconds ago, using a different proxy." % (detail.proxy_id, elapsed_time.seconds))
+                #draw_queue.enqueue(detail)
                 detail = draw_queue.dequeue(requeue=False)
                 now  = datetime.utcnow()
                 elapsed_time = now  - detail.last_used
