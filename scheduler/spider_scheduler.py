@@ -122,9 +122,9 @@ class SpiderScheduler(object):
         while daemon_status is None:
             try:
                 daemon_status = ScrapydApi.daemon_status()
-            except requests.exceptions.ConnectionError:
-                logging.info("scrapyd server refused connection.  Check the url is correct? %s" % SCRAPYD_API_URL)
-                logging.info("If running this inside the docker container, the hostname shouldn't be localhost")
+            except Exception as e:
+                logging.error(e)
+                logging.info("Problem connecting to scrapyd, retrying...")
                 time.sleep(5)
 
         if daemon_status['status'] == 'ok':
