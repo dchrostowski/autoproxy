@@ -64,7 +64,7 @@
     },
 
     "sync_interval": {
-        "value": 500,
+        "value": 200,
         "description": "How many seconds between syncing cache with database"
     },
 
