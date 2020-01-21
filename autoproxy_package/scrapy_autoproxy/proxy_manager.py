@@ -98,6 +98,13 @@ class ProxyManager(object):
         
         rdq_active = RedisDetailQueue(queue_key=queue.queue_key,active=True)
         rdq_inactive = RedisDetailQueue(queue_key=queue.queue_key,active=False)
+
+        if rdq_active.length() == 0:
+            rdq_active.reload()
+
+        if rdq_inactive.length() == 0:
+            rdq_inactive.reload()
+            
         self.logger.info("get_proxy: rdqs created\n\n")
         embed()
         
