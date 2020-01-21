@@ -37,19 +37,24 @@ class ProxyManager(object):
             raise Exception("CANNOT CLONE SEED TO SEED")
         
         seed_details = self.storage_mgr.redis_mgr.get_all_queue_details(seed_queue.queue_key)
-        self.logger.info("clone_seeds, check seed_details")
+        self.logger.info("clone_seeds, check seed_details\n\n")
 
         for seed_detail in seed_details:
-            self.logger.info("for seed_detail in seed_details")
+            self.logger.info("for seed_detail in seed_details\n\n")
             self.storage_mgr.clone_detail(seed_detail,target_queue)
 
         active_rdq = RedisDetailQueue(target_queue.queue_key,active=True)
         inactive_rdq = RedisDetailQueue(target_queue.queue_key,active=False)
 
-        self.logger.info("active and inactive rdq created")
+        self.logger.info("clone_seeds: active and inactive rdq created\n\n")
         embed()
+
         active_rdq.reload()
+        self.logger.info("clone_sedds: after active_rdq.reload()\n\n")
+        embed()
         inactive_rdq.reload()
+        self.logger.info("clone_seeds: after inactive\n\n")
+        
 
         embed()
 
@@ -74,16 +79,16 @@ class ProxyManager(object):
         self.logger.info("length of all queue details: %s" % len(all_queue_details))
         embed()
         if len(all_queue_details) == 0:
-            self.logger.info("no queue details, get some from the database")
+            self.logger.info("no queue details, get some from the database\n\n")
             seed_details = self.storage_mgr.db_mgr.get_non_seed_details(queue.queue_id)
-            self.logger.info("length of details fetched from database:")
+            self.logger.info("length of details fetched from database:\n\n")
             self.logger.info(len(seed_details))
             if len(seed_details) == 0:
-                self.logger.info("There are no details in the database for %s queue" % queue.domain)
+                self.logger.info("There are no details in the database for %s queue\n\n" % queue.domain)
                 self.clone_seeds(queue)
             
             else:
-                self.logger.info("Registering details from database to redis")
+                self.logger.info("Registering details from database to redis\n\n")
                 for seed_detail in seed_details:
                     self.storage_mgr.redis_mgr.register_detail(seed_detail)
                 
@@ -93,12 +98,12 @@ class ProxyManager(object):
         
         rdq_active = RedisDetailQueue(queue_key=queue.queue_key,active=True)
         rdq_inactive = RedisDetailQueue(queue_key=queue.queue_key,active=False)
-        self.logger.info("rdqs created")
+        self.logger.info("get_proxy: rdqs created\n\n")
         embed()
         
 
         self.logger.info("active queue count: %s" % rdq_active.length())
-        self.logger.info("inactive queue count: %s" % rdq_inactive.length())
+        self.logger.info("inactive queue count: %s\n\n" % rdq_inactive.length())
 
         embed()
         use_active = True
@@ -113,6 +118,9 @@ class ProxyManager(object):
             embed()
             self.logger.info("cloning seeds...")
             self.clone_seeds(target_queue=queue)
+
+        logging.info("get_proxy: after clone stuff\n\n")
+        embed()
             
 
         if rdq_active.length() < MIN_QUEUE_SIZE:
