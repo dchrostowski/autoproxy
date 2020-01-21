@@ -601,6 +601,7 @@ class StorageManager(object):
         return proxy
 
     def clone_detail(self,detail,new_queue):
+
         new_queue_key = new_queue.queue_key
         
         if detail.queue_id != SEED_QUEUE_ID:
