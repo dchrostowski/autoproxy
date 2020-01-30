@@ -472,7 +472,14 @@ class RedisManager(object):
     def register_queue(self,queue):
         queue_key = self.register_object('q',queue)
         self.redis.hmset(queue_key, {'queue_key': queue_key})
-        return Queue(**self.redis.hgetall(queue_key))
+
+        queue =  Queue(**self.redis.hgetall(queue_key))
+        if queue.queue_id is not None and queue.queue_id != SEED_QUEUE_ID:
+            existing_queue_details = self.dbh.get_non_seed_details(queue.queue_id)
+            for existing_detail in existing_queue_details:
+                detail = self.register_detail(existing_detail,bypass_db_check=True)
+                rdq = RedisDetailQueue(detail.queue_key)
+                rdq.enqueue(detail)
 
     @block_if_syncing
     def register_proxy(self,proxy):
