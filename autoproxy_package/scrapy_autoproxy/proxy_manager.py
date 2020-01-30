@@ -69,19 +69,23 @@ class ProxyManager(object):
 
     def get_proxy(self,request_url):
         domain = parse_domain(request_url)
+        # get the queue for the request url's domain. If a queue doesn't exist, one will be created.
         queue = self.storage_mgr.redis_mgr.get_queue_by_domain(domain)
+        # self logger name to requst url domain
         self.logger = logging.getLogger(queue.domain)
-        self.logger.debug("got domain: %s" % domain)
-        self.logger.debug("got queue: %s" % queue.queue_key)
-
+        
+        # first get all details that may already be in redis
         all_queue_details = self.storage_mgr.redis_mgr.get_all_queue_details(queue.queue_key)
         
-        self.logger.info("length of all queue details: %s" % len(all_queue_details))
-        embed()
         if len(all_queue_details) == 0:
-            self.logger.info("no queue details, get some from the database\n\n")
-            seed_details = self.storage_mgr.db_mgr.get_non_seed_details(queue.queue_id)
-            self.logger.info("length of details fetched from database:\n\n")
+            if queue.queue_id == SEED_QUEUE_ID:
+                # TODO - maybe throw an exception here because this shouldn't happen.
+                pass
+            else:
+                self.logger.info("no queue details, getting some from the database\n\n")
+                # will return a list of new seed details that have not yet been used for this queue
+                new_queue_details = self.storage_mgr.db_mgr.get_unused_seed_details(queue.queue_id)
+                self.logger("got %s unused seed details" % len(new_queue_details))
             self.logger.info(len(seed_details))
             if len(seed_details) == 0:
                 self.logger.info("There are no details in the database for %s queue\n\n" % queue.domain)

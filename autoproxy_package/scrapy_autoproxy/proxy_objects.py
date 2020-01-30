@@ -166,7 +166,7 @@ class Detail(object):
             "blacklisted": self.blacklisted,
             "blacklisted_count": self.blacklisted_count,
             "lifetime_good": self.lifetime_good,
-            "lifetime_bad": self.lifetime_bad,   
+            "lifetime_bad": self.lifetime_bad, 
         }
 
         if redis_format:
@@ -174,6 +174,8 @@ class Detail(object):
             obj_dict['blacklisted'] = format_redis_boolean(self.blacklisted)
             obj_dict['last_used'] =  format_redis_timestamp(self.last_used)
             obj_dict['last_active'] =format_redis_timestamp(self.last_active)
+            obj_dict['queue_key'] = self.queue_key
+            obj_dict['proxy_key'] = self.proxy_key
 
         if self.detail_id is not None:
             obj_dict.update({'detail_id': self.detail_id})
