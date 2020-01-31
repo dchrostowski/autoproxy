@@ -8,7 +8,7 @@ from setuptools import setup
 
 setup(
     name='scrapy_autoproxy',
-    version='0.0.2',
+    version='0.1.0',
     description='Machine learning proxy picker',
     long_description=open('README.rst').read(),
     keywords='scrapy proxy web-scraping',

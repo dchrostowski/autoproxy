@@ -244,54 +244,48 @@ class Queue(object):
 """
 
 class ProxyObject(Proxy):
-    def __init__(self, storage_manager, detail):
-        self.storage_mgr = storage_manager
+    def __init__(self,detail,storage_manager,rdq):
         self.detail = detail
+        self.storage_mgr = storage_manager
         self.proxy = self.storage_mgr.redis_mgr.get_proxy(detail.proxy_key)
         self._dispatch_time = None
-        self._active_queue = None
-        self._inactive_queue = None
+        self.rdq = rdq
 
         super().__init__(self.proxy.address, self.proxy.port,
                          self.proxy.protocol, self.proxy.proxy_id)
 
-    def dispatch(self, active_queue,inactive_queue):
+    def dispatch(self):
+        self.logger = logging.getLogger(self.proxy.address)
         self._dispatch_time = datetime.utcnow()
-        self._active_queue = active_queue
-        self._inactive_queue = inactive_queue
-        logging.info("proxy stats:")
-        logging.info("----------------------------------------------")
-        logging.info("proxy address/port: %s" % self.proxy.urlify())
-        logging.info("successful requests: %s" % self.detail.lifetime_good)
-        logging.info("unsuccessful requests: %s" % self.detail.lifetime_bad)
-        logging.info("last active: %s" % self.detail.last_active)
-        logging.info("last used: %s" % self.detail.last_used)
-        logging.info("----------------------------------------------")
+        self.logger.info("proxy stats at dispatch:")
+        self.logger.info("----------------------------------------------")
+        self.logger.info("proxy address/port: %s" % self.proxy.urlify())
+        self.logger.info("successful requests: %s" % self.detail.lifetime_good)
+        self.logger.info("unsuccessful requests: %s" % self.detail.lifetime_bad)
+        self.logger.info("last active: %s" % self.detail.last_active)
+        self.logger.info("last used: %s" % self.detail.last_used)
+        self.logger.info("----------------------------------------------")
 
-    def callback(self, success,requeue=True):
-        logging.info("callback called")
-        if self._dispatch_time is None or (requeue and (self._active_queue is None or self._inactive_queue is None)):
+    def callback(self, success):
+        if self._dispatch_time is None:
             raise Exception("Proxy not properly dispatched prior to callback.")
 
+        requeue = True
         self.detail.last_used = datetime.utcnow()
-        return_queue = None
+
+        
 
         if success is None:
-            logging.info("proxy callback(success=None)")
-            if self.detail.active:
-                if requeue:
-                    self._active_queue.enqueue(self.detail)
-            else:
-                if requeue:
-                    self._inactive_queue.enqueue(self.detail)
+            self.logger.info("proxy callback(success=None), will not requeue.")
+            requeue = False
 
         
 
         elif success:
-            logging.info("proxy callback(success=True)")
-            return_queue = self._active_queue
+            self.logger.info("proxy callback(success=True)")
+            
             load_time_delta = datetime.utcnow() - self._dispatch_time
-            self.detail.load_time = int(load_time_delta.microseconds/1000)
+            self.detail.load_time = load_time_delta.seconds
             self.detail.active = True
             self.detail.last_active = datetime.utcnow()
             #self.detail.decrement_bad_count()
@@ -301,25 +295,32 @@ class ProxyObject(Proxy):
                     self.detail.blacklisted_count -= 1
             
         else:
-            logging.info("proxy callback(success=False)")
-            return_queue = self._inactive_queue
+            self.logger.info("proxy callback(success=False)")
             self.detail.bad_count += 1
             self.detail.lifetime_bad += 1
             if self.detail.bad_count > BLACKLIST_THRESHOLD:
-                logging.info("blacklisting detail")
+                self.logger.info("blacklisting detail")
                 self.detail.blacklisted = True
                 self.detail.active = False
                 self.detail.blacklisted_count += 1
         
         self.storage_mgr.redis_mgr.update_detail(self.detail)
-        logging.info("Saved detail to cache")
+        self.logger.info("Saved detail to cache")
+
+        self.logger.info("proxy stats at callback:")
+        self.detail = self.storage_mgr.redis_mgr.get_detail(self.detail.detail_key)
+        self.logger.info("----------------------------------------------")
+        self.logger.info("proxy address/port: %s" % self.proxy.urlify())
+        self.logger.info("successful requests: %s" % self.detail.lifetime_good)
+        self.logger.info("unsuccessful requests: %s" % self.detail.lifetime_bad)
+        self.logger.info("last active: %s" % self.detail.last_active)
+        self.logger.info("last used: %s" % self.detail.last_used)
+        self.logger.info("----------------------------------------------")
         
 
         if requeue:
-            return_queue.enqueue(self.detail)
+            self.rdq.enqueue(self.detail)
 
-        self._active_queue = None
-        self._inactive_queue = None
         self._dispatch_time = None
 
 
