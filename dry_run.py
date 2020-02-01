@@ -11,7 +11,7 @@ main_thread = threading.currentThread()
 redis = Redis(**configuration.redis_config)
 redis.flushall()
 
-test_sites = ['http://gatherproxy.com','http://foo.com', 'http://bar.com', 'http://baz.com', 'http://google.com', 'http://bing.com']
+test_sites = ['https://api.dev.proxycrawler.com','http://gatherproxy.com','http://foo.com', 'http://bar.com', 'http://baz.com', 'http://google.com', 'http://bing.com']
 crawl_statuses = [True,False]
 
 
@@ -39,7 +39,7 @@ def worker():
     print(threading.currentThread().getName(), "starting")
     time.sleep(random.randint(1,10))
     pm = ProxyManager()
-    for i in range(100):
+    for i in range(5):
         url = random.choice(test_sites)
         print(threading.currentThread().getName(), "crawling %s" % url)
         proxy = pm.get_proxy(url)

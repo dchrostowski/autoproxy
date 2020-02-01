@@ -11,23 +11,21 @@ CONFIG_DIR = os.path.join(CUR_DIR,'config')
 #logging.basicConfig(filename='%s/log/api.log' % CWD, format='%(asctime)s - %(message)s', level=logging.INFO)
 
 class ConfigReader(dict):
-    def __init__(self,config_dir=CONFIG_DIR, file_regex=r'([^\.]+)\.json'):
-        #files = [f for f in os.listdir(config_dir) if re.match(file_regex, f)]
-        #config_keys = [re.search(file_regex,f).group(1) for f in files]
-
-        config_keys = []
-        self.update({'files': [f for f in os.listdir(config_dir) if re.match(file_regex, f)]})
+    def __init__(self):
         
-        for f in self['files']:
-            
-            with open("%s/%s" % (config_dir,f)) as ifh:
+        
+        config_key_to_files = {
+            'redis_config': "%s/redis_config.%s.json" % (CONFIG_DIR,CONFIG_ENV),
+            'db_config': "%s/db_config.%s.json" % (CONFIG_DIR,CONFIG_ENV),
+            'app_config': "%s/app_config.json" % CONFIG_DIR
+        }
+        config_keys = []
 
-                config_data = json.load(ifh)
-                config_key = re.search(file_regex,f).group(1) 
-                self.update({config_key: config_data})
-                config_keys.append(config_key)
+        for key,file in config_key_to_files.items():
+            with open(file) as ifh:
+                self.update({key:json.load(ifh)})
+                config_keys.append(key)
             
-        #self.update({'files':files})            
         self.update({'configurations': config_keys})
         for k in self.keys():
             setattr(self,k,self[k])

@@ -8,7 +8,7 @@ from setuptools import setup
 
 setup(
     name='scrapy_autoproxy',
-    version='0.1.0',
+    version='0.2.0',
     description='Machine learning proxy picker',
     long_description=open('README.rst').read(),
     keywords='scrapy proxy web-scraping',
@@ -20,7 +20,7 @@ setup(
         'scrapy_autoproxy',
     ],
     package_dir={'scrapy_autoproxy': 'scrapy_autoproxy'},
-    package_data={'scrapy_autoproxy': ['config/app_config.json','config/db_config.json','config/redis_config.json']},
+    package_data={'scrapy_autoproxy': ['config/app_config.json','config/db_config.docker.json','config/redis_config.docker.json','config/redis_config.local.json','config/db_config.local.json']},
     install_requires=[
         'redis',
         'psycopg2-binary'

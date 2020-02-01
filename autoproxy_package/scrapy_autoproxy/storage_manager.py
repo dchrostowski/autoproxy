@@ -438,7 +438,6 @@ class RedisDetailQueue(object):
                 destination_queue = 'inactive'
                 current_queue = "active"
 
-            self.logger.info("Moving detail from %s to %s queue" % (current_queue,destination_queue))
             correct_queue = RedisDetailQueue(self.queue, active=detail.active)
             return correct_queue.enqueue(detail)
             

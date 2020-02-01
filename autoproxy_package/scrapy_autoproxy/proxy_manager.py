@@ -95,15 +95,6 @@ class ProxyManager(object):
         
         detail = draw_queue.dequeue()
         proxy = ProxyObject(detail, StorageManager(), draw_queue)
-
-        self.logger.info("proxy stats at dequeue:")
-        self.logger.info("----------------------------------------------")
-        self.logger.info(" proxy address/port     : %s" % proxy.urlify())
-        self.logger.info(" successful requests    : %s" % proxy.detail.lifetime_good)
-        self.logger.info(" unsuccessful requests  : %s" % proxy.detail.lifetime_bad)
-        self.logger.info(" last active            : %s" % proxy.detail.last_active)
-        self.logger.info(" last used              : %s" % proxy.detail.last_used)
-        self.logger.info("----------------------------------------------")
         
         now = datetime.utcnow()
         elapsed_time = now - proxy.detail.last_used
