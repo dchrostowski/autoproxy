@@ -8,10 +8,10 @@ import threading
 
 main_thread = threading.currentThread()
 
-#redis = Redis(**configuration.redis_config)
-#redis.flushall()
+redis = Redis(**configuration.redis_config)
+redis.flushall()
 
-test_sites = ['https://api.dev.proxycrawler.com','http://gatherproxy.com','http://foo.com', 'http://bar.com', 'http://baz.com', 'http://google.com', 'http://bing.com']
+test_sites = ['http://gatherproxy.com','http://foo.com', 'http://bar.com', 'http://baz.com', 'http://google.com', 'http://bing.com']
 crawl_statuses = [True,False]
 
 
@@ -37,11 +37,12 @@ def getRunningThreads():
 
 def worker():
     print(threading.currentThread().getName(), "starting")
-    # pm = ProxyManager()
-    for i in range(10):
+    time.sleep(random.randint(1,10))
+    pm = ProxyManager()
+    for i in range(100):
         url = random.choice(test_sites)
         print(threading.currentThread().getName(), "crawling %s" % url)
-        #proxy = pm.get_proxy(url)
+        proxy = pm.get_proxy(url)
         time.sleep(random.randint(1,12))
         success = random.choice(crawl_statuses)
         print(threading.currentThread().getName(), "crawl success=%s" % success)
@@ -49,7 +50,7 @@ def worker():
             successful[url] += 1
         else:
             failures[url] +=1
-        #proxy.callback(success=success)
+        proxy.callback(success=success)
         time.sleep(random.randint(1,6))
 
     print(threading.currentThread().getName(), "stopping")
@@ -69,12 +70,14 @@ def daemon():
     print(threading.currentThread().getName(), 'Starting daemon.')
     for w in workers:
         w.start()
-    time.sleep(4)
+    time.sleep(15)
     while(True):
         scoreboard()
         if getRunningThreads() == 1:
             break
         time.sleep(5)
+    sm = StorageManager()
+    sm.sync_to_db()
     return scoreboard()
     
     
