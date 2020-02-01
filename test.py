@@ -9,10 +9,13 @@ redis = Redis(**configuration.redis_config)
 
 sm = StorageManager()
 pm = ProxyManager()
+"""
+sm.sync_to_db()
+sm.sync_from_db()
 
 for i in range(100):
     proxy = pm.get_proxy('https://foobarbaz.com')
     proxy.callback(success=True)
     time.sleep(random.randint(1,6))
 
-    
+"""

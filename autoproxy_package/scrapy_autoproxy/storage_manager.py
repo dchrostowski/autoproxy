@@ -53,7 +53,7 @@ def block_if_syncing(func):
     @wraps(func)
     def wrapper(self,*args,**kwargs):
         while self.is_syncing() and not self.is_sync_client():
-            logging.info('awaiting sync...')
+            logging.info('awaiting initial sync...')
             time.sleep(5)
         return(func(self,*args,**kwargs))
     return wrapper
@@ -77,7 +77,7 @@ def queue_lock(func):
         
         else:
             while redis.get(lock_key) is not None:
-                logging.debug("Blocked by %s queue lock" % queue.domain)
+                logging.info("Blocked by %s queue lock waiting for operation to complete." % queue.domain)
                 time.sleep(5)
         return
         
@@ -162,7 +162,7 @@ class PostgresManager(object):
         self.insert_object(detail,'details', 'detail_id',cursor)
 
     def insert_queue(self,queue, cursor=None):
-        self.insert_object(queuesyncing,'proxies','proxy_id',cursor)
+        self.insert_object(queue, 'queues','queue_id',cursor)
 
     def init_seed_details(self):
         seed_count = self.do_query("SELECT COUNT(*) as c FROM details WHERE queue_id=%(queue_id)s", {'queue_id':SEED_QUEUE_ID})[0]['c']
@@ -394,12 +394,6 @@ class RedisDetailQueue(object):
                 self.enqueue(detail)
 
 
-
-    @classmethod
-    def new(cls,queue,active):
-        return cls(queue,active)
-
-
     def _update_blacklist_status(self,detail):
         if detail.blacklisted:
             last_used = detail.last_used
@@ -422,16 +416,17 @@ class RedisDetailQueue(object):
     def enqueue(self,detail):
         self._update_blacklist_status(detail)
         if detail.blacklisted:
-            self.logger.warn("detail is blacklisted, will not enqueue")
+            self.logger.info("detail is blacklisted, will not enqueue")
             return
 
         proxy = self.redis_mgr.get_proxy(detail.proxy_key)
         if 'socks' in proxy.protocol:
-            self.logger.warn("not supporting socks proxies right now, will not enqueue %s" % proxy.urlify())
+            self.logger.info("not supporting socks proxies right now, will not enqueue proxy %s" % proxy.urlify())
             return
         
         detail_key = detail.detail_key
         detail_queue_key = self.redis.hget(detail_key,'queue_key')
+        
 
         if detail_queue_key != self.queue.queue_key:
             raise RedisDetailQueueInvalid("No such queue key for detail")
@@ -444,9 +439,9 @@ class RedisDetailQueue(object):
                 current_queue = "active"
 
             self.logger.info("Moving detail from %s to %s queue" % (current_queue,destination_queue))
-            correct_queue = self.new(self.queue, active=detail.active)
-            correct_queue.enqueue(detail)
-            return
+            correct_queue = RedisDetailQueue(self.queue, active=detail.active)
+            return correct_queue.enqueue(detail)
+            
         
         self.redis.rpush(self.redis_key,detail_key)
 
@@ -631,6 +626,7 @@ class RedisManager(object):
         
         return self.register_queue(Queue(domain=domain))
 
+    @block_if_syncing
     def get_queue_by_id(self,qid):
         lookup_key = "%s_%s" % ('q',qid)
         if not self.redis.exists(lookup_key):
@@ -723,7 +719,6 @@ class StorageManager(object):
         fetched_pids_key = "%s%s" % (NEW_QUEUE_PROXY_IDS_PREFIX,queue.domain)
         fetched_pids = list(self.redis_mgr.redis.smembers(fetched_pids_key))
         proxy_ids = self.db_mgr.get_unused_proxy_ids(queue,count,fetched_pids)
-        exclude = 'foo'
         for proxy_id in proxy_ids:
             self.redis_mgr.redis.sadd(fetched_pids_key,proxy_id)
             proxy_key = 'p_%s' % proxy_id

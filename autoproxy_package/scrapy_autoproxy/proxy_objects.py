@@ -257,14 +257,6 @@ class ProxyObject(Proxy):
     def dispatch(self):
         self.logger = logging.getLogger(self.proxy.address)
         self._dispatch_time = datetime.utcnow()
-        self.logger.info("proxy stats at dispatch:")
-        self.logger.info("----------------------------------------------")
-        self.logger.info(" proxy address/port     : %s" % self.proxy.urlify())
-        self.logger.info(" successful requests    : %s" % self.detail.lifetime_good)
-        self.logger.info(" unsuccessful requests  : %s" % self.detail.lifetime_bad)
-        self.logger.info(" last active            : %s" % self.detail.last_active)
-        self.logger.info(" last used              : %s" % self.detail.last_used)
-        self.logger.info("----------------------------------------------")
 
     def callback(self, success):
         if self._dispatch_time is None:

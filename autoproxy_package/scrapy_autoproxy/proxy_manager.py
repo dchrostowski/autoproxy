@@ -7,6 +7,7 @@ import sys
 import logging
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 from IPython import embed
+import time
 
 app_config = lambda config_val: configuration.app_config[config_val]['value']
 
@@ -55,7 +56,9 @@ class ProxyManager(object):
         
         rdq_active = RedisDetailQueue(queue,active=True)
         rdq_inactive = RedisDetailQueue(queue,active=False)
-        not_enqueued = (num_details - (rdq_active.length() + rdq_inactive.length()))
+        num_enqueued = rdq_active.length() + rdq_inactive.length()
+
+        not_enqueued = num_details - num_enqueued
         self.logger.info("----------------------------------------------")
         self.logger.info(" Cached total   : %s" % num_details)
         self.logger.info(" Not enqueued   : %s" % not_enqueued)
@@ -64,7 +67,7 @@ class ProxyManager(object):
         self.logger.info("----------------------------------------------")
 
         if rdq_inactive.length() < MIN_QUEUE_SIZE:
-            logging.info("rdq is less than the min queue size, creating some new details...")
+            self.logger.info("rdq is less than the min queue size, creating some new details...")
             self.storage_mgr.create_new_details(queue=queue)
             # will return a list of new seed details that have not yet been used for this queue
 
@@ -83,21 +86,32 @@ class ProxyManager(object):
         draw_queue = None
         
         if use_active:
-            self.logger.info("using active queue")
+            self.logger.info("using active RDQ")
             draw_queue = rdq_active
         
         else:
-            self.logger.info("using inactive queue")
+            self.logger.info("using inactive RDQ")
             draw_queue = rdq_inactive
         
         
         detail = draw_queue.dequeue()
         proxy = ProxyObject(detail, StorageManager(), draw_queue)
+
+        self.logger.info("proxy stats at dequeue:")
+        self.logger.info("----------------------------------------------")
+        self.logger.info(" proxy address/port     : %s" % proxy.urlify())
+        self.logger.info(" successful requests    : %s" % proxy.detail.lifetime_good)
+        self.logger.info(" unsuccessful requests  : %s" % proxy.detail.lifetime_bad)
+        self.logger.info(" last active            : %s" % proxy.detail.last_active)
+        self.logger.info(" last used              : %s" % proxy.detail.last_used)
+        self.logger.info("----------------------------------------------")
         
         now = datetime.utcnow()
         elapsed_time = now - proxy.detail.last_used
         if elapsed_time.seconds < PROXY_INTERVAL:
-            self.logger.debug("Proxy %s was last used against %s %s seconds ago, using a different proxy." % (proxy.address, domain, elapsed_time.seconds))
+            self.logger.info("Proxy %s was last used against %s %s seconds ago, using a different proxy." % (proxy.address, domain, elapsed_time.seconds))
+            self.logger.info("Current time (UTC): %s" % datetime.utcnow())
+            self.logger.info("Last used: %s" % proxy.detail.last_used)
             return self.get_proxy(request_url)            
         
         self.logger.info("dispatching proxy %s" % proxy.address)
