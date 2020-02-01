@@ -12,7 +12,6 @@ import itertools
 from scrapy_autoproxy.storage_manager import StorageManager
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 from requests.auth import HTTPBasicAuth
-import signal
 
 app_config = lambda config_val: configuration.app_config[config_val]['value']
 SCRAPYD_API_URL = app_config('scrapyd_api_endpoint')
@@ -212,23 +211,6 @@ class SpiderScheduler(object):
 
 tq = TaskQueue()
 
-
-class SigtermHandler:
-    kill_now = False
-    def __init__(self):
-        signal.signal(signal.SIGINT, self.do_sync)
-        signal.signal(signal.SIGTERM, self.do_sync)
-
-    def do_sync(self):
-        logging.info("received SIGTERM or SIGINT, running sync.")
-        self.kill_now = True
-        storage_mgr = StorageManager()
-        storage_mgr.sync_to_db()
-        logging.info("sync complete")
-
-
-sigterm_handler = SigtermHandler()
-
 if __name__ == "__main__":
     scheduler = SpiderScheduler()
     all_active_jobs = scheduler.active_jobs()
@@ -266,23 +248,19 @@ if __name__ == "__main__":
 
 
     spider_gen = scheduler.spider_generator('autoproxy')
-
-
-    while not sigterm_handler.kill_now:
-        for spider in scheduler.spider_generator('autoproxy'):
-
-            if len(scheduler.active_jobs(**spider)) < MAX_JOBS:
-                if scheduler.allow_new_jobs:
-                    logging.info("enqueueing task to schedule %s" % spider)
-                    tq.enqueue(Task(**spider,fn=schedule_spider))
-            
-            now = datetime.datetime.now()
-            start = scheduler.start_time
-            elapsed = now - start
-            logging.info("elapsed time since last sync: %s" % elapsed.seconds)
-            if elapsed.seconds > SYNC_INTERVAL and scheduler.allow_new_jobs:
-                logging.info("enqueuing sync task")
-                scheduler.allow_new_jobs = False
-                tq.enqueue(Task(fn=do_sync))
-            
-            time.sleep(4)
+    for spider in itertools.cycle(spider_gen):
+        if len(scheduler.active_jobs(**spider)) < MAX_JOBS:
+            if scheduler.allow_new_jobs:
+                logging.info("enqueueing task to schedule %s" % spider)
+                tq.enqueue(Task(**spider,fn=schedule_spider))
+        
+        now = datetime.datetime.now()
+        start = scheduler.start_time
+        elapsed = now - start
+        logging.info("elapsed time since last sync: %s" % elapsed.seconds)
+        if elapsed.seconds > SYNC_INTERVAL and scheduler.allow_new_jobs:
+            logging.info("enqueuing sync task")
+            scheduler.allow_new_jobs = False
+            tq.enqueue(Task(fn=do_sync))
+        
+        time.sleep(2)
