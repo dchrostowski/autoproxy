@@ -731,7 +731,7 @@ class StorageManager(object):
             new_detail = Detail(**detail_kwargs)
             self.redis_mgr.register_detail(new_detail,bypass_db_check=True)
 
-    @block_if_syncing
+    
     def sync_to_db(self):
         new_queues = [Queue(**self.redis_mgr.redis.hgetall(q)) for q in self.redis_mgr.redis.keys("qt_*")]
         new_proxies = [Proxy(**self.redis_mgr.redis.hgetall(p)) for p in self.redis_mgr.redis.keys("pt_*")]
