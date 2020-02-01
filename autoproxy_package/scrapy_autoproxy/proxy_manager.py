@@ -30,15 +30,14 @@ class ProxyManager(object):
         self.storage_mgr = StorageManager()
         self.logger = logging.getLogger(__name__)
 
-    def get_seed_proxy(self):
-        return None
-
     def get_proxy(self,request_url):
+        is_seed = False
         domain = parse_domain(request_url)
         # get the queue for the request url's domain. If a queue doesn't exist, one will be created.
         queue = self.storage_mgr.redis_mgr.get_queue_by_domain(domain)
+        
         if queue.id() == SEED_QUEUE_ID:
-            return self.get_seed_proxy()
+            is_seed = True
         
         # self logger name to requst url domain
         self.logger = logging.getLogger(queue.domain)
@@ -51,8 +50,8 @@ class ProxyManager(object):
         
         
         
-        if num_details == 0:
-            self.storage_mgr.redis_mgr.initialize_queuequeue=(queue)
+        if num_details == 0 and not is_seed:
+            self.storage_mgr.redis_mgr.initialize_queue(queue=queue)
         
         rdq_active = RedisDetailQueue(queue,active=True)
         rdq_inactive = RedisDetailQueue(queue,active=False)
@@ -66,12 +65,12 @@ class ProxyManager(object):
         self.logger.info(" Inactive RDQ   : %s" % rdq_inactive.length())
         self.logger.info("----------------------------------------------")
 
-        if rdq_inactive.length() < MIN_QUEUE_SIZE:
+        if rdq_inactive.length() < MIN_QUEUE_SIZE and not is_seed:
             self.logger.info("rdq is less than the min queue size, creating some new details...")
             self.storage_mgr.create_new_details(queue=queue)
             # will return a list of new seed details that have not yet been used for this queue
 
-        elif flip_coin(SEED_FREQUENCY):
+        elif flip_coin(SEED_FREQUENCY) and not is_seed:
             self.storage_mgr.create_new_details(queue=queue,count=1)
 
         use_active = True
