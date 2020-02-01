@@ -54,7 +54,7 @@
     },
 
     "min_queue_size": {
-        "value": 20,
+        "value": 5,
         "description": "minimum active queue count before drawing from active queue"
     },
 
@@ -69,16 +69,16 @@
     },
 
     "initial_seed_count": {
-        "value": 100
+        "value": 50
     },
 
     "active_proxies_per_queue": {
-        "value": 50,
+        "value": 20,
         "description": "The max number of active proxies to be loaded into memory per sync interval order by last_used descending"
     },
 
     "inactive_proxies_per_queue": {
-        "value": 50,
+        "value": 20,
         "descripton": "The number of inactive proxies to be loaded into memory per sync interval"
     },
 

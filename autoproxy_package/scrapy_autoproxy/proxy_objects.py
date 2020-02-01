@@ -259,11 +259,11 @@ class ProxyObject(Proxy):
         self._dispatch_time = datetime.utcnow()
         self.logger.info("proxy stats at dispatch:")
         self.logger.info("----------------------------------------------")
-        self.logger.info("proxy address/port: %s" % self.proxy.urlify())
-        self.logger.info("successful requests: %s" % self.detail.lifetime_good)
-        self.logger.info("unsuccessful requests: %s" % self.detail.lifetime_bad)
-        self.logger.info("last active: %s" % self.detail.last_active)
-        self.logger.info("last used: %s" % self.detail.last_used)
+        self.logger.info(" proxy address/port     : %s" % self.proxy.urlify())
+        self.logger.info(" successful requests    : %s" % self.detail.lifetime_good)
+        self.logger.info(" unsuccessful requests  : %s" % self.detail.lifetime_bad)
+        self.logger.info(" last active            : %s" % self.detail.last_active)
+        self.logger.info(" last used              : %s" % self.detail.last_used)
         self.logger.info("----------------------------------------------")
 
     def callback(self, success):
@@ -276,14 +276,11 @@ class ProxyObject(Proxy):
         
 
         if success is None:
-            self.logger.info("proxy callback(success=None), will not requeue.")
             requeue = False
 
         
 
         elif success:
-            self.logger.info("proxy callback(success=True)")
-            
             load_time_delta = datetime.utcnow() - self._dispatch_time
             self.detail.load_time = load_time_delta.seconds
             self.detail.active = True
@@ -305,18 +302,18 @@ class ProxyObject(Proxy):
                 self.detail.blacklisted_count += 1
         
         self.storage_mgr.redis_mgr.update_detail(self.detail)
-        self.logger.info("Saved detail to cache")
+        
 
         self.logger.info("proxy stats at callback:")
         self.detail = self.storage_mgr.redis_mgr.get_detail(self.detail.detail_key)
         self.logger.info("----------------------------------------------")
-        self.logger.info("proxy address/port: %s" % self.proxy.urlify())
-        self.logger.info("successful requests: %s" % self.detail.lifetime_good)
-        self.logger.info("unsuccessful requests: %s" % self.detail.lifetime_bad)
-        self.logger.info("last active: %s" % self.detail.last_active)
-        self.logger.info("last used: %s" % self.detail.last_used)
+        self.logger.info(" proxy address/port     : %s" % self.proxy.urlify())
+        self.logger.info(" successful requests    : %s" % self.detail.lifetime_good)
+        self.logger.info(" unsuccessful requests  : %s" % self.detail.lifetime_bad)
+        self.logger.info(" last active            : %s" % self.detail.last_active)
+        self.logger.info(" last used              : %s" % self.detail.last_used)
         self.logger.info("----------------------------------------------")
-        
+        self.logger.info("Updated proxy %s in cache" % self.urlify())
 
         if requeue:
             self.rdq.enqueue(self.detail)

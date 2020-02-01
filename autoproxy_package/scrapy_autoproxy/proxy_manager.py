@@ -51,18 +51,25 @@ class ProxyManager(object):
         
         
         if num_details == 0:
-            self.storage_mgr.redis_mgr.initialize_queue(queue)
+            self.storage_mgr.redis_mgr.initialize_queuequeue=(queue)
         
-        rdq_active = RedisDetailQueue(queue.queue_key,active=True)
-        rdq_inactive = RedisDetailQueue(queue.queue_key,active=False)
+        rdq_active = RedisDetailQueue(queue,active=True)
+        rdq_inactive = RedisDetailQueue(queue,active=False)
+        not_enqueued = (num_details - (rdq_active.length() + rdq_inactive.length()))
+        self.logger.info("----------------------------------------------")
+        self.logger.info(" Cached total   : %s" % num_details)
+        self.logger.info(" Not enqueued   : %s" % not_enqueued)
+        self.logger.info(" Active RDQ     : %s" % rdq_active.length())
+        self.logger.info(" Inactive RDQ   : %s" % rdq_inactive.length())
+        self.logger.info("----------------------------------------------")
 
         if rdq_inactive.length() < MIN_QUEUE_SIZE:
             logging.info("rdq is less than the min queue size, creating some new details...")
-            self.storage_mgr.create_new_details(queue)
+            self.storage_mgr.create_new_details(queue=queue)
             # will return a list of new seed details that have not yet been used for this queue
 
         elif flip_coin(SEED_FREQUENCY):
-            self.storage_mgr.create_new_details(queue,count=1)
+            self.storage_mgr.create_new_details(queue=queue,count=1)
 
         use_active = True
 

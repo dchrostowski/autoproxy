@@ -43,6 +43,7 @@ NEW_DETAILS_SET_KEY = 'new_details'
 CHANGED_DETAILS_SET_KEY = 'changed_details'
 INITIAL_SEED_COUNT = app_config('initial_seed_count')
 MIN_QUEUE_SIZE = app_config('min_queue_size')
+NEW_QUEUE_PROXY_IDS_PREFIX = 'new_proxy_ids_'
 
 
 
@@ -59,11 +60,31 @@ def block_if_syncing(func):
 
 
 # To do - acquire queue sync lock
-"""
-def acquire_queue_lock(func):
+
+def queue_lock(func):
     @wraps(func)
     def wrapper(self,*args,**kwargs):
-"""
+        redis = Redis(**configuration.redis_config)
+        queue = kwargs.get('queue',None)
+        if queue is None:
+            raise Exception("queue_lock function must have a queue kwrargs")
+        lock_key = 'syncing_%s' % queue.domain
+        lock = redis.lock(lock_key)
+        if lock.acquire(blocking=True,blocking_timeout=0):
+            logging.info("acquired %s queue lock" % lock_key)
+            func(self,*args,**kwargs)
+            lock.release()
+        
+        else:
+            while redis.get(lock_key) is not None:
+                logging.debug("Blocked by %s queue lock" % queue.domain)
+                time.sleep(5)
+        return
+        
+
+    return wrapper
+
+
     
 
 class PostgresManager(object):
@@ -220,14 +241,25 @@ class PostgresManager(object):
 
         return active + inactive
 
-    def get_unused_proxy_ids(self,queue,count):
+    def get_unused_proxy_ids(self,queue,count,excluded_pids):
+        
         query = None
-        params = {'seed_queue_id': SEED_QUEUE_ID,  'limit': count}
+        excluded_pids.append(-1)
+        excluded_pids.append(-2)
+
+        params = {
+            'seed_queue_id': SEED_QUEUE_ID,
+            'limit': count,
+            'active': True,
+            'excluded_pids': tuple(excluded_pids)
+        }
         
         if queue.id() is None:
             query = """
                 SELECT proxy_id FROM details 
-                WHERE queue_id = %(seed_queue_id)s 
+                WHERE queue_id = %(seed_queue_id)s
+                AND active = %(active)s
+                AND proxy_id NOT IN %(excluded_pids)s
                 ORDER BY RANDOM()
                 LIMIT %(limit)s
                 """
@@ -238,19 +270,24 @@ class PostgresManager(object):
                 SELECT proxy_id FROM details 
                 WHERE queue_id = %(seed_queue_id)s 
                 AND proxy_id NOT IN ( SELECT proxy_id FROM details WHERE queue_id = %(queue_id)s )
+                AND proxy_id NOT IN %(excluded_pids)s
+                AND active = %(active)s
                 ORDER BY RANDOM()
                 LIMIT %(limit)s
                 """
 
-        logging.debug("get_unused_proxy_ids, about to do query")
-
-        return [pid[0] for pid in self.do_query(query,params)]
         
 
+        pids = [pid[0] for pid in self.do_query(query,params)]
         
+        if len(pids) < count:
+            params['count'] = count - len(pids)
+            params['active'] = False
+            result = self.do_query(query,params)
+            for ipid in result:
+                pids.append(ipid[0])
 
-
-        
+        return pids
 
     def init_seed_queues(self):
         logging.info("Initializing queues...")
@@ -336,19 +373,21 @@ class RedisDetailQueueInvalid(Exception):
     pass
 
 class RedisDetailQueue(object):
-    def __init__(self,queue_key,active=True):
+    def __init__(self,queue,active=True):
         self.redis_mgr = RedisManager()
 
         self.redis = self.redis_mgr.redis
-        self.queue_key = queue_key
+        self.queue = queue
         self.active = active
         active_clause = "active"
         if not active:
             active_clause = "inactive"
-        self.redis_key = 'redis_%s_detail_queue_%s' % (active_clause, queue_key)
+        self.redis_key = 'redis_%s_detail_queue_%s' % (active_clause, self.queue.queue_key)
+
+        self.logger = logging.getLogger('RDQ:%s' % self.queue.domain)
 
     def reload(self):
-        details = self.redis_mgr.get_all_queue_details(self.queue_key)
+        details = self.redis_mgr.get_all_queue_details(self.queue.queue_key)
         self.clear()
         for detail in details:
             if detail.active == self.active:
@@ -357,8 +396,8 @@ class RedisDetailQueue(object):
 
 
     @classmethod
-    def new(cls,queue_key,active):
-        return cls(queue_key,active)
+    def new(cls,queue,active):
+        return cls(queue,active)
 
 
     def _update_blacklist_status(self,detail):
@@ -367,7 +406,7 @@ class RedisDetailQueue(object):
             now = datetime.utcnow()
             delta_t = now - last_used
             if delta_t.seconds > BLACKLIST_TIME and detail.blacklisted_count < MAX_BLACKLIST_COUNT:
-                logging.info("unblacklisting detail")
+                self.loger.info("unblacklisting detail")
                 detail.blacklisted = False
                 self.redis_mgr.update_detail(detail)
         
@@ -383,23 +422,29 @@ class RedisDetailQueue(object):
     def enqueue(self,detail):
         self._update_blacklist_status(detail)
         if detail.blacklisted:
-            logging.warn("detail is blacklisted, will not enqueue")
+            self.logger.warn("detail is blacklisted, will not enqueue")
             return
 
         proxy = self.redis_mgr.get_proxy(detail.proxy_key)
         if 'socks' in proxy.protocol:
-            logging.warn("not supporting socks proxies right now, will not enqueue")
+            self.logger.warn("not supporting socks proxies right now, will not enqueue %s" % proxy.urlify())
             return
         
         detail_key = detail.detail_key
         detail_queue_key = self.redis.hget(detail_key,'queue_key')
 
-        if detail_queue_key != self.queue_key:
+        if detail_queue_key != self.queue.queue_key:
             raise RedisDetailQueueInvalid("No such queue key for detail")
         
         if detail.active != self.active:
-            logging.warn("rdq.active=%s and detail.active=%s.  Will enqueue to the other queue" % (self.active, detail.active))
-            correct_queue = self.new(self.queue_key, active=detail.active)
+            destination_queue = 'active'
+            current_queue = "inactive"
+            if self.active:
+                destination_queue = 'inactive'
+                current_queue = "active"
+
+            self.logger.info("Moving detail from %s to %s queue" % (current_queue,destination_queue))
+            correct_queue = self.new(self.queue, active=detail.active)
             correct_queue.enqueue(detail)
             return
         
@@ -409,7 +454,7 @@ class RedisDetailQueue(object):
 
     def dequeue(self):
         if self.is_empty():
-            raise RedisDetailQueueEmpty("No proxies available for queue key %s" % self.queue_key)
+            raise RedisDetailQueueEmpty("No proxies available for queue key %s" % self.queue.queue_key)
 
         detail = Detail(**self.redis.hgetall(self.redis.lpop(self.redis_key)))
         return detail
@@ -439,6 +484,8 @@ class RedisManager(object):
 
     def is_syncing(self):
         return self.redis.get('syncing') is not None
+
+
 
     @block_if_syncing
     def sync_from_db(self):
@@ -470,7 +517,7 @@ class RedisManager(object):
         logging.info("registering seed details...")
 
         seed_queue = self.get_queue_by_id(SEED_QUEUE_ID)
-        seed_rdq = RedisDetailQueue(seed_queue.queue_key)
+        seed_rdq = RedisDetailQueue(seed_queue)
 
         for seed_detail in seed_details:
             registered_detail = self.register_detail(seed_detail,bypass_db_check=True)
@@ -515,7 +562,7 @@ class RedisManager(object):
 
         return Queue(**self.redis.hgetall(queue_key))
     
-    @block_if_syncing
+    @queue_lock
     def initialize_queue(self,queue):
         logging.info("initializing %s queue..." % queue.domain)
         if queue.id() is None:
@@ -525,7 +572,7 @@ class RedisManager(object):
         existing_queue_details = self.dbh.get_non_seed_details(queue.queue_id)
         for existing_detail in existing_queue_details:
             detail = self.register_detail(existing_detail,bypass_db_check=True)
-            rdq = RedisDetailQueue(detail.queue_key)
+            rdq = RedisDetailQueue(queue)
             rdq.enqueue(detail)
 
 
@@ -563,8 +610,8 @@ class RedisManager(object):
             self.redis.hmset(detail_key,redis_data)
             if not bypass_db_check:
                 self.redis.sadd(NEW_DETAILS_SET_KEY,detail_key)
-        logging.info("successfully registerd detail.")
-        rdq = RedisDetailQueue(detail.queue_key,active=detail.active)
+        
+        rdq = RedisDetailQueue(self.get_queue_by_key(detail.queue_key),active=detail.active)
         detail = self.get_detail(detail_key)
         rdq.enqueue(detail)
         return detail
@@ -588,7 +635,10 @@ class RedisManager(object):
         lookup_key = "%s_%s" % ('q',qid)
         if not self.redis.exists(lookup_key):
             raise Exception("No such queue with id %s" % qid)
-        return Queue(**self.redis.hgetall(lookup_key))            
+        return Queue(**self.redis.hgetall(lookup_key))
+
+    def get_queue_by_key(self,queue_key):
+        return Queue(**self.redis.hgetall(queue_key))
 
     def get_proxy(self,proxy_key):
         return Proxy(**self.redis.hgetall(proxy_key))
@@ -667,12 +717,15 @@ class StorageManager(object):
         
         return proxy
     
-    @block_if_syncing
+    @queue_lock
     def create_new_details(self,queue,count=ACTIVE_LIMIT+INACTIVE_LIMIT):
-
-        proxy_ids = self.db_mgr.get_unused_proxy_ids(queue,count)
+        logging.info("creating %s new details for domain %s..." % (count, queue.domain))
+        fetched_pids_key = "%s%s" % (NEW_QUEUE_PROXY_IDS_PREFIX,queue.domain)
+        fetched_pids = list(self.redis_mgr.redis.smembers(fetched_pids_key))
+        proxy_ids = self.db_mgr.get_unused_proxy_ids(queue,count,fetched_pids)
+        exclude = 'foo'
         for proxy_id in proxy_ids:
-
+            self.redis_mgr.redis.sadd(fetched_pids_key,proxy_id)
             proxy_key = 'p_%s' % proxy_id
             if not self.redis_mgr.redis.exists(proxy_key):
                 raise Exception("Error while trying to create a new detail: proxy key does not exist in redis cache for proxy id %s" % proxy_id)
