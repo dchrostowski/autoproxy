@@ -5,7 +5,7 @@ from scrapy_autoproxy.proxy_objects import ProxyObject
 from datetime import datetime
 import sys
 import logging
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 from IPython import embed
 import time
 
@@ -17,7 +17,6 @@ MAX_BLACKLIST_COUNT = app_config('max_blacklist_count')
 SEED_FREQUENCY =  app_config('seed_frequency')
 MIN_QUEUE_SIZE = app_config('min_queue_size')
 INACTIVE_PCT = app_config('inactive_pct')
-SYNC_INTERVAL = app_config('sync_interval')
 ACTIVE_PROXIES_PER_QUEUE = app_config('active_proxies_per_queue')
 INACTIVE_PROXIES_PER_QUEUE = app_config('inactive_proxies_per_queue')
 SEED_QUEUE_ID = app_config('seed_queue')

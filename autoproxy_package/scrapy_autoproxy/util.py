@@ -3,7 +3,7 @@ import re
 import random
 import sys
 import logging
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 from datetime import datetime
 
 

@@ -63,11 +63,6 @@
         "description": "Percent/probability for when to use an unblacklisted, inactive proxy (sum of this and seed_frequency should not exceed 1)"
     },
 
-    "sync_interval": {
-        "value": 600,
-        "description": "How many seconds between syncing cache with database"
-    },
-
     "initial_seed_count": {
         "value": 500
     },
@@ -80,16 +75,6 @@
     "inactive_proxies_per_queue": {
         "value": 100,
         "descripton": "The number of inactive proxies to be loaded into memory per sync interval"
-    },
-
-    "scrapyd_api_endpoint": {
-        "value": "http://scrapyd:6800",
-        "description": "URL used to access the scrapyd API"
-    },
-
-    "scrapyd_max_jobs_per_spider": {
-        "value": 2,
-        "description":  "how many instances of each spider may be enqueued at once"
     },
 
     "scrapyd_job_timeout": {

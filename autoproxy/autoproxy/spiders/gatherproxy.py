@@ -9,7 +9,7 @@ import json
 from scrapy_autoproxy.proxy_objects import Proxy
 from scrapy_autoproxy.storage_manager import StorageManager
 
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 class GatherproxySpider(scrapy.Spider):
     name = 'gatherproxy'

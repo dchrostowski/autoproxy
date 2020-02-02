@@ -1,3 +1,5 @@
 #!/bin/sh
-docker-compose kill spider_scheduler
+docker-compose stop scrapyd
+docker-compose rm -f autoproxy_scrapyd
+docker-compose rm -f scrapyd
 docker-compose stop

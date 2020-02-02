@@ -9,8 +9,6 @@ services:
     depends_on:
       - db
       - redis
-    env_file: 
-      - ./scrapyd.env
     container_name: "autoproxy_scrapyd"
   redis:
     image: "redis:alpine"
@@ -39,8 +37,6 @@ services:
     build:
       context: .
       dockerfile: scheduler/Dockerfile
-    env_file: 
-      - ./scrapyd.env
     depends_on:
       - scrapyd
     container_name: autoproxy_scheduler

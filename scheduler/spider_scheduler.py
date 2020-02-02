@@ -1,6 +1,5 @@
 import requests
 from IPython import embed
-from scrapy_autoproxy.config import configuration
 import sys
 import os
 import logging
@@ -10,16 +9,25 @@ import time
 import datetime
 import itertools
 from scrapy_autoproxy.storage_manager import StorageManager
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 from requests.auth import HTTPBasicAuth
 
-app_config = lambda config_val: configuration.app_config[config_val]['value']
-SCRAPYD_API_URL = app_config('scrapyd_api_endpoint')
-SCRAPYD_USERNAME = os.environ.get('SCRAPYD_USERNAME')
-SCRAPYD_PASSWORD = os.environ.get('SCRAPYD_PASSWORD')
-MAX_JOBS = app_config('scrapyd_max_jobs_per_spider')
-SYNC_INTERVAL = app_config('sync_interval')
-SCRAPYD_JOB_TIMEOUT = app_config('scrapyd_job_timeout')
+import configparser
+import os
+
+SCRAPYD_CFG_FILE = os.environ.get('SCRAPYD_CFG_FILE', 'scrapy.cfg')
+config = configparser.ConfigParser()
+config.read(SCRAPYD_CFG_FILE)
+
+AUTOPROXY_ENV = os.environ.get('AUTOPROXY_ENV','local')
+
+deploy_section_env = "deploy:%s" % AUTOPROXY_ENV
+SCRAPYD_API_URL = config[deploy_section_env]['url']
+SCRAPYD_USERNAME = config[deploy_section_env]['username']
+SCRAPYD_PASSWORD = config[deploy_section_env]['password']
+MAX_JOBS = int(config['autoproxy:scheduler']['max_jobs'])
+SYNC_INTERVAL = int(config['autoproxy:scheduler']['sync_interval'])
+SCRAPYD_JOB_TIMEOUT = int(config['autoproxy:scheduler']['job_timeout'])
 
 
 class Task(object):
@@ -88,7 +96,8 @@ class ScrapydApi(object):
     def list_spiders(project):
         url = ScrapydApi.url('listspiders.json')
         resp = requests.get(url, params={'project':project}, auth=ScrapydApi.auth())
-        return resp.json()['spiders']
+        
+        return resp.json().get('spiders',[])
 
     @staticmethod
     def schedule(project,spider):
@@ -130,13 +139,17 @@ class SpiderScheduler(object):
         if daemon_status['status'] == 'ok':
             self.start_time = datetime.datetime.now()
             self.allow_new_jobs = True
-            project_list = ScrapydApi.list_projects()
-            self.project_spiders = {}
+            projects = []
+            available_projects = ScrapydApi.list_projects()
             
-            for project in project_list:
-                self.project_spiders[project] = ScrapydApi.list_spiders(project)[2:]
+            self.project_spiders = {}
 
-            self.projects = project_list
+            for project in available_projects:
+                available_spiders = ScrapydApi.list_spiders(project)
+                if len(available_spiders) > 0:
+                    projects.append(project)
+                    self.project_spiders[project] = available_spiders[2:]
+            self.projects = projects
 
     def all_spiders(self):
         for project, spiders in self.project_spiders.items():
