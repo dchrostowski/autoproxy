@@ -64,7 +64,7 @@
     },
 
     "initial_seed_count": {
-        "value": 1000
+        "value": 500
     },
 
     "active_proxies_per_queue": {
