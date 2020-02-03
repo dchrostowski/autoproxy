@@ -27,9 +27,7 @@ class GatherproxySpider(scrapy.Spider):
 
     def make_proxy(self,address,port,location,protocol='http'):
         port = int(port,16)
-        proxy = Proxy(address=address,port=port)
-        self.storage_mgr.new_proxy(proxy)
-        return proxy
+        self.storage_mgr.new_proxy(address,port,protocol)
 
     def log_proxy_info(self,proxy):
         log_str = """
@@ -42,14 +40,9 @@ class GatherproxySpider(scrapy.Spider):
 
     def parse_list(self, response):
         script_elements = response.xpath('//script[contains(text(),"insertPrx")]').extract()
-        proxies = []
         for script_text in script_elements:
             proxy_data = json.loads(re.search(r'insertPrx\(([^\)]+)\);',script_text).group(1))
-            proxies.append(self.make_proxy(proxy_data['PROXY_IP'], proxy_data['PROXY_PORT'], proxy_data['PROXY_COUNTRY']))
-
-        
-        for proxy in proxies:
-            self.log_proxy_info(proxy)
+            self.make_proxy(proxy_data['PROXY_IP'], proxy_data['PROXY_PORT'], proxy_data['PROXY_COUNTRY'])
 
     def parse(self,response):
         links = response.xpath('//ul[@class="pc-list"]/li/a/@href').extract()

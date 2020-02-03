@@ -76,8 +76,8 @@ class ProxydbSpider(scrapy.Spider):
     def parse(self,response):
         proxies = self.deobfuscate(response)
         for pdata in proxies:
-            proxy = Proxy(address=pdata['address'], port=pdata['port'],protocol=pdata['protocol'])
-            self.storage_mgr.new_proxy(proxy)
+            #proxy = Proxy(address=pdata['address'], port=pdata['port'],protocol=pdata['protocol'])
+            self.storage_mgr.new_proxy(pdata['address'],pdata['port'],pdata['protocol'])
         
         proxies_by_dropdown_urls = response.xpath('//div[@aria-labelledby="navbar_dropdown_shortcuts"]/a/@href').extract()
         for url in proxies_by_dropdown_urls:
@@ -91,5 +91,4 @@ class ProxydbSpider(scrapy.Spider):
         print("parsing cat link")
         proxies = self.deobfuscate(response)
         for pdata in proxies:
-            proxy = Proxy(address=pdata['address'], port=pdata['port'],protocol=pdata['protocol'])
-            self.storage_mgr.new_proxy(proxy)
+            self.storage_mgr.new_proxy(pdata['address'],pdata['port'],pdata['protocol'])

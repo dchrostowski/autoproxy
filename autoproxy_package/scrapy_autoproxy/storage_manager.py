@@ -675,11 +675,12 @@ class StorageManager(object):
     def is_syncing(self):
         return self.redis_mgr.is_syncing()
 
-    def new_proxy(self,proxy):
-        existing = self.redis_mgr.get_proxy_by_address_and_port(proxy.address,proxy.port)
+    def new_proxy(self,address,port,protocol='http'):
+        existing = self.redis_mgr.get_proxy_by_address_and_port(address,port)
         if existing is None:
-            logging.info("registering new proxy %s" % proxy.urlify())
-            new_proxy = self.redis_mgr.register_proxy(proxy)
+            
+            new_proxy = self.redis_mgr.register_proxy(Proxy(address,port,protocol))
+            logging.info("registering new proxy %s" % new_proxy.urlify())
             new_detail = Detail(proxy_key=new_proxy.proxy_key, queue_id=SEED_QUEUE_ID)
             try:
                 self.redis_mgr.register_detail(new_detail)

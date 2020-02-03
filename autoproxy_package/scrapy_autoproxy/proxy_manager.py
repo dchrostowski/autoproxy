@@ -108,6 +108,6 @@ class ProxyManager(object):
         
         
 
-    def new_proxy(self,proxy):
-        return self.storage_mgr.new_proxy(proxy)
+    def new_proxy(self,address,port,protocol='http'):
+        return self.storage_mgr.new_proxy(address,port,protocol)
         

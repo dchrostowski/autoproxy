@@ -23,8 +23,7 @@ class ProxylistySpider(scrapy.Spider):
 
             yield request
 
-    def parse(self, response):
-
+    def parse_proxies(self,response):
         trs = response.xpath('//div[@id="content"]//table[1]/tr[position()>1]')
         for tr in trs:
             tds = tr.xpath('td')
@@ -33,17 +32,25 @@ class ProxylistySpider(scrapy.Spider):
             protocol = tr.xpath('td[3]/text()').extract_first()
 
             if address is not None and port is not None and protocol is not None:
-                try:
-                    proxy = Proxy(address=address,port=int(port),protocol=protocol.lower())
-                    print(proxy)
-                    self.storage_mgr.new_proxy(proxy)
-                except:
-                    pass
+                self.storage_mgr.new_proxy(address,port,protocol)
+            
+        next_link = response.xpath('//div[@id="content"]//table[1]/tr/td[@colspan="9"]/ul/li/a[text()="Next"]/@href').extract_first()
 
+
+
+        if next_link is not None:
+            yield scrapy.Request(url=response.urljoin(next_link),callback=self.parse_proxies,dont_filter=True)
+
+
+    def parse(self, response):
+        yield self.parse_proxies(response)
+        additional_links = response.xpath('//li[@class="has-sub"][2]/div[@class="wideblock"][1]/div[1]/ul//a/@href').extract()
+        for link in additional_links:
+            yield scrapy.Request(url=link,callback=self.parse_proxies)
 
         
-        next_link = response.xpath('//div[@id="content"]//table[1]/tr/td[@colspan="9"]/ul/li/a[text()="Next"]/@href').extract_first()
-        if next_link is not None:
-            yield scrapy.Request(url=response.urljoin(next_link),callback=self.parse,dont_filter=True)
+
+        
+        
             
             

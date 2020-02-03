@@ -28,5 +28,4 @@ class IpAdressSpider(scrapy.Spider):
             address = tr.xpath('td[1]/a/text()').extract_first()
             port = tr.xpath('td[1]/text()').extract_first()
             port = re.search(r'(\d+)', port).group(1)
-            proxy = Proxy(address=address,port=int(port))
-            self.storage_mgr.new_proxy(proxy)            
+            self.storage_mgr.new_proxy(address,port)            
