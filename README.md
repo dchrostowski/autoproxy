@@ -21,8 +21,9 @@ I'm still working on this, but here's how to run it:
 ```
 git clone https://github.com/dchrostowski/autoproxy.git
 cd autoproxy
-docker-compose build
-docker-compose up
+docker-compose build scrapyd
+docker-compose build spider_scheduler
+docker-compose up scrapyd spider_scheduler
 ```
 
 ### Getting proxies

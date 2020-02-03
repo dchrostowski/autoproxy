@@ -69,7 +69,7 @@ class ProxydbSpider(scrapy.Spider):
                 proxies.append({ 'address': address, 'port':port, 'protocol': protocol })
 
         except Exception as e:
-            logging.warn(e)
+            logging.warning(e)
 
         return proxies
 

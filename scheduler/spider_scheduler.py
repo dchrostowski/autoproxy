@@ -111,7 +111,7 @@ class ScrapydApi(object):
         if resp.json()['status'] == 'ok':
             logging.info("OK")
         else:
-            logging.warn("Error while scheduling spider: %s" % resp.json()['message'] )
+            logging.warning("Error while scheduling spider: %s" % resp.json()['message'] )
             return None
 
     @staticmethod
@@ -244,7 +244,7 @@ if __name__ == "__main__":
             logging.info("there are %s active jobs" % len(scheduler.active_jobs()))
             timed_out_jobs = scheduler.get_timed_out_jobs()
             if len(timed_out_jobs) > 0:
-                logging.warn("There are %s timed out jobs" % len(timed_out_jobs))
+                logging.warning("There are %s timed out jobs" % len(timed_out_jobs))
                 for toj in timed_out_jobs:
                     to_project = toj['project']
                     to_jid = toj['id']

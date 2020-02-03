@@ -9,7 +9,6 @@ idna==2.8
 incremental==17.5.0
 lxml==4.5.0
 parsel==1.5.2
-project==1.0
 Protego==0.1.16
 py-mini-racer==0.1.18
 pyasn1==0.4.8
@@ -20,8 +19,12 @@ PyHamcrest==2.0.0
 pyOpenSSL==19.1.0
 queuelib==1.5.0
 Scrapy==1.8.0
+scrapy-user-agents==0.1.1
 service-identity==18.1.0
 six==1.14.0
 Twisted==19.10.0
+ua-parser==0.8.0
+user-agents==2.0
 w3lib==1.21.0
 zope.interface==4.7.1
+

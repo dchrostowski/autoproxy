@@ -563,7 +563,7 @@ class RedisManager(object):
     def initialize_queue(self,queue):
         logging.info("initializing %s queue..." % queue.domain)
         if queue.id() is None:
-            logging.warn("Queue does not exist in database yet, skipping database pull...")
+            logging.warning("Queue does not exist in database yet, skipping database pull...")
             return
         
         existing_queue_details = self.dbh.get_non_seed_details(queue.queue_id)
@@ -580,7 +580,7 @@ class RedisManager(object):
     @block_if_syncing
     def register_detail(self,detail,bypass_db_check=False):
         if bypass_db_check and not self.is_syncing:
-            logging.warn("WARNING: It is a bad idea to register a detail to the cache without checking that it is in the database first.  I hope you know what you're doing...")
+            logging.warning("WARNING: It is a bad idea to register a detail to the cache without checking that it is in the database first.  I hope you know what you're doing...")
         if detail.proxy_key is None or detail.queue_key is None:
             raise Exception('detail object must have a proxy and queue key')
         if not self.redis.exists(detail.proxy_key) or not self.redis.exists(detail.queue_key):
@@ -707,7 +707,7 @@ class StorageManager(object):
                 raise Exception("Error while trying to create a new detail: proxy key does not exist in redis cache for proxy id %s" % proxy_id)
             
             if self.redis_mgr.redis.exists('d_%s_%s' % (queue.queue_key,proxy_key)):
-                logging.warn("Will not create a detail from proxy id %s for %s queue as it already exists" % (proxy_id,queue.domain))
+                logging.warning("Will not create a detail from proxy id %s for %s queue as it already exists" % (proxy_id,queue.domain))
                 continue
             detail_kwargs = {'proxy_id': proxy_id, 'proxy_key': proxy_key, 'queue_id': queue.id(), 'queue_key': queue.queue_key}
             new_detail = Detail(**detail_kwargs)
@@ -738,7 +738,7 @@ class StorageManager(object):
                 proxy_id = cursor.fetchone()[0]
                 proxy_keys_to_id[p.proxy_key] = proxy_id
             except psycopg2.errors.UniqueViolation as e:
-                logging.warn("Duplicate proxy, fetch proxy id from database.")
+                logging.warning("Duplicate proxy, fetch proxy id from database.")
                 # existing_proxy = self.db_mgr.get_proxy_by_address_and_port(p.address,p.port)
                 proxy_keys_to_id[p.proxy_key] = None
 
@@ -747,7 +747,7 @@ class StorageManager(object):
             if d.proxy_id is None:
                 new_proxy_id = proxy_keys_to_id[d.proxy_key]
                 if new_proxy_id is None:
-                    logging.warn("Discarding new detail, as it may already exist.")
+                    logging.warning("Discarding new detail, as it may already exist.")
                     continue
                 else:
                     d.proxy_id = new_proxy_id
