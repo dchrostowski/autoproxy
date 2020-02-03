@@ -156,14 +156,14 @@ class AutoproxyDownloaderMiddleware(object):
         
         if self.exception_mgr.is_defective_proxy(exception):
             proxy.callback(success=False)
+            return None
+        
+        else:    
             proxy = self.proxy_mgr.get_proxy(request.url)
             request.meta['proxy'] = proxy.urlify()
             request.meta['proxy_obj'] = proxy
             return request
         
-
-
-        return None
 
     def spider_opened(self, spider):
         spider.logger.info('Spider opened: %s' % spider.name)
