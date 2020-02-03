@@ -128,7 +128,7 @@ class AutoproxyDownloaderMiddleware(object):
             return response
 
         if response.status == 404:
-            proxy.callback(success=None, requeue=False)
+            proxy.callback(success=None)
             return response
             
         
