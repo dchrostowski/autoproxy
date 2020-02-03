@@ -28,7 +28,7 @@ class Proxy(object):
 
     def __init__(self, address, port, protocol='http', proxy_id=None, proxy_key=None):
         self.address = address
-        self.port = port
+        self.port = int(port)
         if protocol not in self.__class__.AVAILABLE_PROTOCOLS:
             raise Exception("Invalid protocol %s" % protocol)
         self.protocol = protocol
@@ -56,7 +56,7 @@ class Proxy(object):
     def to_dict(self,redis_format=False):
         obj_dict = {
             "address": self.address,
-            "port":  self.port,
+            "port":  str(self.port),
             "protocol": self.protocol,
         }
 

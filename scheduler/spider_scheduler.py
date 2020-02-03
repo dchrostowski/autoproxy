@@ -8,9 +8,12 @@ import queue
 import time
 import datetime
 import itertools
-from scrapy_autoproxy.storage_manager import StorageManager
+from scrapy_autoproxy.config import configuration
+from scrapy_autoproxy.storage_manager import StorageManager, Redis
+
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 from requests.auth import HTTPBasicAuth
+
 
 import configparser
 import os
@@ -20,6 +23,9 @@ config = configparser.ConfigParser()
 config.read(SCRAPYD_CFG_FILE)
 
 AUTOPROXY_ENV = os.environ.get('AUTOPROXY_ENV','local')
+Redis(**configuration.redis_config).flushall()
+
+
 
 deploy_section_env = "deploy:%s" % AUTOPROXY_ENV
 SCRAPYD_API_URL = config[deploy_section_env]['url']

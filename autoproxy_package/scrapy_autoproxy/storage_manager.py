@@ -46,6 +46,8 @@ MIN_QUEUE_SIZE = app_config('min_queue_size')
 NEW_QUEUE_PROXY_IDS_PREFIX = 'new_proxy_ids_'
 
 
+class DetailExistsException(Exception):
+    pass
 
 
 # decorator for RedisManager methods
@@ -568,8 +570,6 @@ class RedisManager(object):
         existing_queue_details = self.dbh.get_non_seed_details(queue.queue_id)
         for existing_detail in existing_queue_details:
             detail = self.register_detail(existing_detail,bypass_db_check=True)
-            rdq = RedisDetailQueue(queue)
-            rdq.enqueue(detail)
 
 
     @block_if_syncing
@@ -596,10 +596,10 @@ class RedisManager(object):
         if not bypass_db_check:
             db_detail =  self.dbh.get_detail_by_queue_and_proxy(queue_id=detail.queue_id, proxy_id=detail.proxy_id)
             if db_detail is not None:
-                raise Exception("Detail already exists in database.  Cannot register detail without deliberately bypassing database check")
+                raise DetailExistsException("Detail already exists in database.  Cannot register detail without deliberately bypassing database check")
 
         if self.redis.exists(detail.detail_key):
-            raise Exception("Detail is already registered.")
+            raise DetailExistsException("Detail is already registered.")
             # return Detail(**self.redis.hgetall(detail_key))
         else:
             redis_data = detail.to_dict(redis_format=True)
@@ -645,11 +645,15 @@ class RedisManager(object):
         self.redis.sadd(CHANGED_DETAILS_SET_KEY,detail.detail_key)
 
     def get_proxy_by_address_and_port(self,address,port):
-        proxy_keys = self.redis.keys('p*') + self.redis.keys('pt*')
-        all_proxies = [Proxy(**self.redis.hgetall(pkey)) for pkey in proxy_keys]
-        proxy_dict = {"%s:%s" % (proxy.address,proxy.port): proxy for proxy in all_proxies}
-        search_key = "%s:%s" % (address,port)
-        return proxy_dict.get(search_key,None)
+        proxy_keys = self.redis.keys('p*')
+        all_proxy_data = [self.redis.hgetall(pkey) for pkey in proxy_keys]
+        for pd in all_proxy_data:
+            if str(pd['address']) == str(address):
+                if str(pd['port']) == str(port):
+                    return Proxy(**pd)
+
+
+        return None
 
     def get_all_queue_details(self, queue_key):
         key_match = 'd_%s*' % queue_key
@@ -678,41 +682,18 @@ class StorageManager(object):
             logging.info("registering new proxy %s" % proxy.urlify())
             new_proxy = self.redis_mgr.register_proxy(proxy)
             new_detail = Detail(proxy_key=new_proxy.proxy_key, queue_id=SEED_QUEUE_ID)
-            self.redis_mgr.register_detail(new_detail)
-            self.redis_mgr.redis.sadd(NEW_DETAILS_SET_KEY,new_detail.detail_key)
+            try:
+                self.redis_mgr.register_detail(new_detail)
+                self.redis_mgr.redis.sadd(NEW_DETAILS_SET_KEY,new_detail.detail_key)
+            except DetailExistsException:
+                logging.info("Proxy already exists in cache/db")
+                pass
+            
         else:
             logging.info("proxy already exists in cache/db")
 
     def get_seed_queue(self):
         return self.redis_mgr.get_queue_by_id(SEED_QUEUE_ID)
-
-    def create_queue(self,url):
-        logging.info("creating queue for %s" % url)
-        domain = parse_domain(url)
-        all_queues_by_domain = {queue.domain: queue for queue in self.redis_mgr.get_all_queues()}
-        if domain in all_queues_by_domain:
-            logging.warn("Trying to create a queue that already exists.")
-            return all_queues_by_domain[domain]
-        
-        return self.redis_mgr.register_queue(Queue(domain=domain))
-
-    def create_proxy(self, address, port, protocol):
-        proxy_keys = self.redis_mgr.redis.keys('p*')
-        for pkey in proxy_keys:
-            if self.redis_mgr.redis.hget(pkey,'address') == address and self.redis_mgr.redis.hget(pkey,'port'):
-                logging.warn("Trying to create a proxy that already exists")
-                return Proxy(**self.redis_mgr.redis.hgetall(pkey))
-
-        proxy = Proxy(address=address,port=port,protocol=protocol)
-        proxy = self.redis_mgr.register_proxy(proxy)
-        proxy_key = proxy.proxy_key
-        queue_key = "%s_%s" % ('q',SEED_QUEUE_ID)
-        detail = Detail(proxy_key=proxy_key,queue_id=SEED_QUEUE_ID,queue_key=queue_key)
-        
-        
-        self.redis_mgr.register_detail(detail)
-        
-        return proxy
     
     @queue_lock
     def create_new_details(self,queue,count=ACTIVE_LIMIT+INACTIVE_LIMIT):
