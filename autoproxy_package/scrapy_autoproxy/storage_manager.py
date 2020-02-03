@@ -518,7 +518,6 @@ class RedisManager(object):
 
         for seed_detail in seed_details:
             registered_detail = self.register_detail(seed_detail,bypass_db_check=True)
-            seed_rdq.enqueue(registered_detail)
 
         logging.info("registered seed details.")
         #logging.info("fetching non-seed details from database...")

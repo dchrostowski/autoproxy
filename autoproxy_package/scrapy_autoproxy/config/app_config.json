@@ -54,7 +54,7 @@
     },
 
     "min_queue_size": {
-        "value": 15,
+        "value": 20,
         "description": "minimum active queue count before drawing from active queue"
     },
 
@@ -64,22 +64,17 @@
     },
 
     "initial_seed_count": {
-        "value": 500
+        "value": 1000
     },
 
     "active_proxies_per_queue": {
-        "value": 100,
+        "value": 200,
         "description": "The max number of active proxies to be loaded into memory per sync interval order by last_used descending"
     },
 
     "inactive_proxies_per_queue": {
-        "value": 100,
+        "value": 200,
         "descripton": "The number of inactive proxies to be loaded into memory per sync interval"
-    },
-
-    "scrapyd_job_timeout": {
-        "value": 330,
-        "description": "number of seconds a spider has to complete its job"
     }
 
 }
