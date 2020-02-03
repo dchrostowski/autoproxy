@@ -4,7 +4,7 @@ from scrapy_autoproxy.storage_manager import StorageManager
 from scrapy_autoproxy.proxy_objects import Proxy
 import sys
 import logging
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 
 class ProxylistySpider(scrapy.Spider):

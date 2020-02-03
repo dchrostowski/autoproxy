@@ -9,7 +9,7 @@ import re
 from functools import wraps
 from copy import deepcopy
 from datetime import datetime, timedelta
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 import traceback
 
 from psycopg2.extras import DictCursor
@@ -163,6 +163,9 @@ class PostgresManager(object):
 
     def insert_queue(self,queue, cursor=None):
         self.insert_object(queue, 'queues','queue_id',cursor)
+    
+    def insert_proxy(self,proxy,cursor=None):
+        self.insert_object(proxy,'proxies','proxy_id',cursor)
 
     def init_seed_details(self):
         seed_count = self.do_query("SELECT COUNT(*) as c FROM details WHERE queue_id=%(queue_id)s", {'queue_id':SEED_QUEUE_ID})[0]['c']
@@ -515,7 +518,6 @@ class RedisManager(object):
 
         for seed_detail in seed_details:
             registered_detail = self.register_detail(seed_detail,bypass_db_check=True)
-            seed_rdq.enqueue(registered_detail)
 
         logging.info("registered seed details.")
         #logging.info("fetching non-seed details from database...")

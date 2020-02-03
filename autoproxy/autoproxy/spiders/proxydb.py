@@ -12,7 +12,7 @@ from scrapy_autoproxy.storage_manager import StorageManager
 ctx = py_mini_racer.MiniRacer()
 ctx.eval(" var atob = (arg) => arg ")
 
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 class ProxydbSpider(scrapy.Spider):
     name = 'proxydb'

@@ -1,5 +1,4 @@
 #!/bin/sh
-chmod +x /start/scrapyd.env
-htpasswd -b -c /etc/nginx/htpasswd $SCRAPYD_USERNAME $SCRAPYD_PASSWORD
+python3 create_htpasswd.py
 service nginx start
 /usr/local/bin/scrapyd

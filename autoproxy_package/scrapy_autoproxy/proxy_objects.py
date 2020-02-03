@@ -6,7 +6,7 @@ import inspect
 import re
 import sys
 import logging
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 from scrapy_autoproxy.config import configuration
 from scrapy_autoproxy.util import format_redis_boolean, format_redis_timestamp, parse_boolean, parse_timestamp
 # 1/1/2000
@@ -20,7 +20,6 @@ DECREMENT_BLACKLIST = app_config('decrement_blacklist')
 MAX_BLACKLIST_COUNT = app_config('max_blacklist_count')
 SEED_FREQUENCY =  app_config('seed_frequency')
 INACTIVE_PCT = app_config('inactive_pct')
-SYNC_INTERVAL = app_config('sync_interval')
 ACTIVE_PROXIES_PER_QUEUE = app_config('active_proxies_per_queue')
 INACTIVE_PROXIES_PER_QUEUE = app_config('inactive_proxies_per_queue')
 
