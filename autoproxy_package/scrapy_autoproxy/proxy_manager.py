@@ -57,10 +57,10 @@ class ProxyManager(object):
 
         not_enqueued = num_details - num_enqueued
         self.logger.info("----------------------------------------------")
-        self.logger.info(" Cached total   : %s" % num_details)
-        self.logger.info(" Not enqueued   : %s" % not_enqueued)
-        self.logger.info(" Active RDQ     : %s" % rdq_active.length())
-        self.logger.info(" Inactive RDQ   : %s" % rdq_inactive.length())
+        self.logger.info(" Cached total   : %s      |" % num_details)
+        self.logger.info(" Not enqueued   : %s      |" % not_enqueued)
+        self.logger.info(" Active RDQ     : %s      |" % rdq_active.length())
+        self.logger.info(" Inactive RDQ   : %s      |" % rdq_inactive.length())
         self.logger.info("----------------------------------------------")
 
         if rdq_inactive.length() < MIN_QUEUE_SIZE and not is_seed:
