@@ -14,7 +14,6 @@ import traceback
 
 from psycopg2.extras import DictCursor
 from psycopg2 import sql
-from IPython import embed
 from scrapy_autoproxy.proxy_objects import Proxy, Detail, Queue
 from scrapy_autoproxy.util import parse_domain
 

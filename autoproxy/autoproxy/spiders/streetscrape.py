@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import scrapy
-from IPython import embed
+
 import logging
 import sys
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)

@@ -3,7 +3,6 @@ import scrapy
 import sys
 import base64
 import logging
-from IPython import embed
 import re
 from py_mini_racer import py_mini_racer
 from scrapy_autoproxy.proxy_objects import Proxy

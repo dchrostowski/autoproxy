@@ -1,7 +1,6 @@
 import os
 import json
 import re
-from IPython import embed
 import logging
 
 CONFIG_ENV = os.environ.get('AUTOPROXY_ENV','local')

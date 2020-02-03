@@ -1,5 +1,4 @@
 import requests
-from IPython import embed
 import sys
 import os
 import logging

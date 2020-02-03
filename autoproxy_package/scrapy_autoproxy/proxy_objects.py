@@ -1,4 +1,4 @@
-from IPython import embed
+
 from datetime import datetime
 import time
 from random import randint
@@ -9,7 +9,7 @@ import logging
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 from scrapy_autoproxy.config import configuration
 from scrapy_autoproxy.util import format_redis_boolean, format_redis_timestamp, parse_boolean, parse_timestamp
-# 1/1/2000
+
 DEFAULT_TIMESTAMP = datetime.fromtimestamp(946684800)
 BOOLEAN_VALS = (True,'1',False,'0')
 app_config = lambda config_val: configuration.app_config[config_val]['value']

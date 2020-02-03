@@ -7,7 +7,6 @@
 
 from scrapy.exceptions import IgnoreRequest
 from scrapy import signals
-from IPython import embed
 
 from scrapy_autoproxy.proxy_manager import ProxyManager
 from scrapy_autoproxy.exception_manager import ExceptionManager

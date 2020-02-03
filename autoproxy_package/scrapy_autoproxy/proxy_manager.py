@@ -6,7 +6,6 @@ from datetime import datetime
 import sys
 import logging
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-from IPython import embed
 import time
 
 app_config = lambda config_val: configuration.app_config[config_val]['value']

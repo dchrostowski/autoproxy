@@ -2,7 +2,6 @@
 import scrapy
 import sys
 import logging
-from IPython import embed
 import re
 import json
 from scrapy_autoproxy.proxy_objects import Proxy

@@ -1,6 +1,5 @@
 import sys
 import logging
-from IPython import embed
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 from twisted.internet.error import TimeoutError, ConnectError
