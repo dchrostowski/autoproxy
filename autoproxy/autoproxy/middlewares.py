@@ -141,7 +141,7 @@ class AutoproxyDownloaderMiddleware(object):
         logger.info(exception)
 
         if type(exception) == RedisDetailQueueEmpty:
-            return request
+            return None
 
         
         proxy = request.meta.get('proxy_obj',None)
