@@ -47,7 +47,10 @@ def parse_timestamp(timestamp_val):
         return timestamp_val
 
     if type(timestamp_val) == str:
-        return datetime.fromisoformat(timestamp_val)
+        try:
+            return datetime.strptime(timestamp_val, "%Y-%m-%dT%H:%M:%S.%f")
+        except ValueError:
+           return  datetime.strptime(timestamp_val, "%Y-%m-%dT%H:%M:%S")
 
     else:
         raise Exception("Invalid type for proxy object timestamp")
