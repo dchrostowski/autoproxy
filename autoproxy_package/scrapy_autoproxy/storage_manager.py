@@ -197,6 +197,7 @@ class PostgresManager(object):
 
         
     def get_seed_details(self):
+        self.init_seed_details()
 
         params = {'seed_queue_id': SEED_QUEUE_ID}
         query= """
@@ -429,6 +430,7 @@ class RedisDetailQueue(object):
 
         proxy = self.redis_mgr.get_proxy(detail.proxy_key)
         if 'socks' in proxy.protocol:
+    
             return
         
         detail_key = detail.detail_key
@@ -473,12 +475,10 @@ class RedisManager(object):
         self.dbh = PostgresManager()
 
         if len(self.redis.keys()) == 0:
-            logging.info('STARTING SYNC FROM DB')
             lock = self.redis.lock('syncing')
             if lock.acquire(blocking=True, blocking_timeout=0):
                 self.redis.client_setname('syncer')
                 self.sync_from_db()
-                logging.deug("SYNC FROM DB COMPLETE")
                 self.redis.client_setname('')
                 lock.release()
 
@@ -512,7 +512,37 @@ class RedisManager(object):
         for p in proxies:
             self.register_proxy(p)
 
-        self.dbh.init_seed_details()
+        
+
+        seed_details = self.dbh.get_seed_details()
+
+
+
+
+        seed_queue = self.get_queue_by_id(SEED_QUEUE_ID)
+        seed_rdq = RedisDetailQueue(seed_queue)
+
+        for seed_detail in seed_details:
+            registered_detail = self.register_detail(seed_detail,bypass_db_check=True)
+
+
+
+
+        #other_details = []
+        """
+        for q in queues:
+
+            if q.queue_id != SEED_QUEUE_ID and q.queue_id != AGGREGATE_QUEUE_ID:
+                details = self.dbh.get_non_seed_details(queue_id=q.queue_id)
+                other_details.extend(details)
+        
+        
+
+
+        for d in other_details:
+            self.register_detail(d)
+
+        """
 
     
     @block_if_syncing
@@ -531,18 +561,9 @@ class RedisManager(object):
     def register_queue(self,queue):
         queue_key = self.register_object('q',queue)
         self.redis.hmset(queue_key, {'queue_key': queue_key})
+
         return Queue(**self.redis.hgetall(queue_key))
     
-    @block_if_syncing
-    @queue_lock
-    def initialize_seed_queue(self):
-        seed_details = self.dbh.get_seed_details()
-        seed_queue = self.get_queue_by_id(SEED_QUEUE_ID)
-
-        for seed_detail in seed_details:
-            registered_detail = self.register_detail(seed_detail,bypass_db_check=True)
-    
-    @block_if_syncing
     @queue_lock
     def initialize_queue(self,queue):
 
