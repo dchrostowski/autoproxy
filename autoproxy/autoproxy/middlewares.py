@@ -11,7 +11,7 @@ from scrapy import signals
 from scrapy_autoproxy.proxy_manager import ProxyManager
 from scrapy_autoproxy.exception_manager import ExceptionManager
 from scrapy_autoproxy.util import parse_domain
-from scrapy_autoproxy.storage_manager import RedisDetailQueue
+from scrapy_autoproxy.storage_manager import RedisDetailQueueEmpty
 import sys
 import logging
 import twisted
