@@ -1,13 +1,11 @@
 import os
 import json
 import re
-import logging
 
 CONFIG_ENV = os.environ.get('AUTOPROXY_ENV','local')
 
 CUR_DIR, _ = os.path.split(__file__)
 CONFIG_DIR = os.path.join(CUR_DIR,'config')
-#logging.basicConfig(filename='%s/log/api.log' % CWD, format='%(asctime)s - %(message)s', level=logging.DEBUG)
 
 class ConfigReader(dict):
     def __init__(self):

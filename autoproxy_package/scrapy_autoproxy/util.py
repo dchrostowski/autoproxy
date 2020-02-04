@@ -2,8 +2,8 @@ from urllib.parse import urlparse
 import re
 import random
 import sys
-import logging
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+
+
 from datetime import datetime
 
 
@@ -51,6 +51,3 @@ def parse_timestamp(timestamp_val):
 
     else:
         raise Exception("Invalid type for proxy object timestamp")
-
-
-    

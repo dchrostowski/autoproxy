@@ -29,18 +29,18 @@ sys.path.append("%s/autoproxy/autoproxy_middleware" % CWD)
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = False
 RETRY_ENABLED = False
-DOWNLOAD_TIMEOUT =60
+DOWNLOAD_TIMEOUT =120
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
-#CONCURRENT_REQUESTS = 32
+CONCURRENT_REQUESTS = 64
 
-# Configure a delay for requests for the same website (default: 0)
+# Configure a delay for requests for the same website (default: 0)gi
 # See https://docs.scrapy.org/en/latest/topics/settings.html#download-delay
 # See also autothrottle settings and docs
 DOWNLOAD_DELAY = 2
 DOWNLOAD_DELAY_DEBUG = True
 # The download delay setting will honor only one of:
 CONCURRENT_REQUESTS_PER_DOMAIN = 8
-#CONCURRENT_REQUESTS_PER_IP = 16
+#CONCURRENT_REQUESTS_PER_IP = 100
 
 # Disable cookies (enabled by default)
 #COOKIES_ENABLED = False
@@ -64,9 +64,12 @@ COOKIES_ENABLED = True
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
-    'autoproxy.middlewares.AutoproxyDownloaderMiddleware': 299,
-    'scrapy_user_agents.middlewares.RandomUserAgentMiddleware': 298
+    'autoproxy.middlewares.AutoproxyDownloaderMiddleware': 543,
+    'scrapy_user_agents.middlewares.RandomUserAgentMiddleware': 400,
+    'scrapy.downloadermiddlewares.useragent.UserAgentMiddleware': None
+    
 }
+
 
 RANDOM_UA_PER_PROXY = True
 logging.getLogger('scrapy_user_agents.user_agent_picker').setLevel(logging.CRITICAL)

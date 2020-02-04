@@ -21,6 +21,7 @@ INACTIVE_PROXIES_PER_QUEUE = app_config('inactive_proxies_per_queue')
 SEED_QUEUE_ID = app_config('seed_queue')
 PROXY_INTERVAL = app_config('proxy_interval')
 
+import logging
 
 
 class ProxyManager(object):
@@ -47,6 +48,8 @@ class ProxyManager(object):
         #logging.debug("\n\n\n\n\nafter get num details for queue")
         
         
+        if num_details == 0 and is_seed:
+            self.storage_mgr.initialize_seed_queue()
         
         if num_details == 0 and not is_seed:
             self.storage_mgr.redis_mgr.initialize_queue(queue=queue)
@@ -56,12 +59,14 @@ class ProxyManager(object):
         num_enqueued = rdq_active.length() + rdq_inactive.length()
 
         not_enqueued = num_details - num_enqueued
-        self.logger.info("----------------------------------------------")
-        self.logger.info(" Cached total   : %s      |" % num_details)
-        self.logger.info(" Not enqueued   : %s      |" % not_enqueued)
-        self.logger.info(" Active RDQ     : %s      |" % rdq_active.length())
-        self.logger.info(" Inactive RDQ   : %s      |" % rdq_inactive.length())
-        self.logger.info("----------------------------------------------")
+        logging.info("""
+        ------------------------------------|
+        --------------| Cached total   : %s |
+        --------------| Not enqueued   : %s |
+        --- ----------| Active RDQ     : %s |
+        --------------| Inactive RDQ   : %s |
+        -----------------------------------------------|
+        """ % (num_details,not_enqueued,rdq_active.length(),rdq_inactive.length()))
 
         if rdq_inactive.length() < MIN_QUEUE_SIZE and not is_seed:
             self.logger.info("rdq is less than the min queue size, creating some new details...")
@@ -97,12 +102,9 @@ class ProxyManager(object):
         now = datetime.utcnow()
         elapsed_time = now - proxy.detail.last_used
         if elapsed_time.seconds < PROXY_INTERVAL:
-            self.logger.info("Proxy %s was last used against %s %s seconds ago, using a different proxy." % (proxy.address, domain, elapsed_time.seconds))
-            self.logger.info("Current time (UTC): %s" % datetime.utcnow())
-            self.logger.info("Last used: %s" % proxy.detail.last_used)
+            self.logger.warn("Proxy %s was last used against %s %s seconds ago, using a different proxy." % (proxy.address, domain, elapsed_time.seconds))
             return self.get_proxy(request_url)            
         
-        self.logger.info("dispatching proxy %s" % proxy.address)
         proxy.dispatch()
         return proxy
         

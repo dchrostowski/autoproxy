@@ -11,9 +11,11 @@ from scrapy import signals
 from scrapy_autoproxy.proxy_manager import ProxyManager
 from scrapy_autoproxy.exception_manager import ExceptionManager
 from scrapy_autoproxy.util import parse_domain
+from scrapy_autoproxy.storage_manager import RedisDetailQueue
 import sys
 import logging
 import twisted
+import time
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -73,7 +75,9 @@ class AutoproxyDownloaderMiddleware(object):
     # passed objects.
 
     def __init__(self,*args,**kwargs):
+        
         self.proxy_mgr = ProxyManager()
+        logging.info(self.proxy_mgr.storage_mgr.redis_mgr)
         self.exception_mgr = ExceptionManager()
 
     @classmethod
@@ -121,16 +125,6 @@ class AutoproxyDownloaderMiddleware(object):
             proxy.callback(success=False)
             return response
 
-        if response.status == 403:
-            logging.info("Got 403 response, marking bad")
-            proxy.callback(success=False)
-            return response
-
-        if response.status == 404:
-            proxy.callback(success=None)
-            return response
-            
-        
         proxy.callback(success=True)
         return response
 
@@ -146,23 +140,17 @@ class AutoproxyDownloaderMiddleware(object):
         spider.logger.info("processing exception for %s" % request.url)
         logger.info(exception)
 
-        
+        if type(exception) == RedisDetailQueueEmpty:
+            return request
 
+        
         proxy = request.meta.get('proxy_obj',None)
 
         if proxy is None:
             logger.warn("no proxy object found in request.meta")
 
-        
-        if self.exception_mgr.is_defective_proxy(exception):
-            proxy.callback(success=False)
-            return None
-        
-        else:    
-            proxy = self.proxy_mgr.get_proxy(request.url)
-            request.meta['proxy'] = proxy.urlify()
-            request.meta['proxy_obj'] = proxy
-            return request
+        proxy.callback(success=False)
+        return None
         
 
     def spider_opened(self, spider):

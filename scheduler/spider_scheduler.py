@@ -8,7 +8,7 @@ import time
 import datetime
 import itertools
 from scrapy_autoproxy.config import configuration
-from scrapy_autoproxy.storage_manager import StorageManager, Redis
+from scrapy_autoproxy.storage_manager import StorageManager
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 from requests.auth import HTTPBasicAuth
@@ -22,7 +22,6 @@ config = configparser.ConfigParser()
 config.read(SCRAPYD_CFG_FILE)
 
 AUTOPROXY_ENV = os.environ.get('AUTOPROXY_ENV','local')
-Redis(**configuration.redis_config).flushall()
 
 
 

@@ -5,8 +5,7 @@ from random import randint
 import inspect
 import re
 import sys
-import logging
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+
 from scrapy_autoproxy.config import configuration
 from scrapy_autoproxy.util import format_redis_boolean, format_redis_timestamp, parse_boolean, parse_timestamp
 
@@ -22,6 +21,7 @@ SEED_FREQUENCY =  app_config('seed_frequency')
 INACTIVE_PCT = app_config('inactive_pct')
 ACTIVE_PROXIES_PER_QUEUE = app_config('active_proxies_per_queue')
 INACTIVE_PROXIES_PER_QUEUE = app_config('inactive_proxies_per_queue')
+import logging
 
 class Proxy(object):
     AVAILABLE_PROTOCOLS = ('http', 'https', 'socks5', 'socks4')
@@ -29,6 +29,7 @@ class Proxy(object):
     def __init__(self, address, port, protocol='http', proxy_id=None, proxy_key=None):
         self.address = address
         self.port = int(port)
+        protocol = protocol.lower()
         if protocol not in self.__class__.AVAILABLE_PROTOCOLS:
             raise Exception("Invalid protocol %s" % protocol)
         self.protocol = protocol
@@ -254,10 +255,10 @@ class ProxyObject(Proxy):
                          self.proxy.protocol, self.proxy.proxy_id)
 
     def dispatch(self):
-        self.logger = logging.getLogger(self.proxy.address)
         self._dispatch_time = datetime.utcnow()
 
     def callback(self, success):
+        logging.info("callback=%s for proxy %s" % (success,self.urlify()))
         if self._dispatch_time is None:
             raise Exception("Proxy not properly dispatched prior to callback.")
 
@@ -272,6 +273,7 @@ class ProxyObject(Proxy):
         
 
         elif success:
+            logging.info("proxy.callback(success=True)")
             load_time_delta = datetime.utcnow() - self._dispatch_time
             self.detail.load_time = load_time_delta.seconds
             self.detail.active = True
@@ -283,11 +285,11 @@ class ProxyObject(Proxy):
                     self.detail.blacklisted_count -= 1
             
         else:
-            self.logger.info("proxy callback(success=False)")
+            logging.info("proxy.callback(success=False)")
             self.detail.bad_count += 1
             self.detail.lifetime_bad += 1
             if self.detail.bad_count > BLACKLIST_THRESHOLD:
-                self.logger.info("blacklisting detail")
+
                 self.detail.blacklisted = True
                 self.detail.active = False
                 self.detail.blacklisted_count += 1
@@ -295,16 +297,24 @@ class ProxyObject(Proxy):
         self.storage_mgr.redis_mgr.update_detail(self.detail)
         
 
-        self.logger.info("proxy stats at callback:")
+
         self.detail = self.storage_mgr.redis_mgr.get_detail(self.detail.detail_key)
-        self.logger.info("----------------------------------------------")
-        self.logger.info(" proxy address/port     : %s" % self.proxy.urlify())
-        self.logger.info(" successful requests    : %s" % self.detail.lifetime_good)
-        self.logger.info(" unsuccessful requests  : %s" % self.detail.lifetime_bad)
-        self.logger.info(" last active            : %s" % self.detail.last_active)
-        self.logger.info(" last used              : %s" % self.detail.last_used)
-        self.logger.info("----------------------------------------------")
-        self.logger.info("Updated proxy %s in cache" % self.urlify())
+
+
+        logging.info("""
+        ----------|---------------------------------------------------------------------|
+        ----------|  proxy address/port     : %s  
+        ----------|  successful requests    : %s" 
+        ----------|  unsuccessful requests  : %s" 
+        ----------|  last active            : %s" 
+        ----------|  last used              : %s" 
+        ----------|---------------------------------------------------------------------| 
+        """ % (self.urlify(), self.detail.lifetime_good, self.detail.lifetime_bad, self.detail.last_active, self.detail.last_used))
+
+
+
+
+
 
         if requeue:
             self.rdq.enqueue(self.detail)

@@ -12,7 +12,7 @@ class StreetscrapeSpider(scrapy.Spider):
     start_urls = ['https://api.dev.proxycrawler.com/proxy/test']
 
     def __init__(self,*args,**kwargs):
-        self.count = int(kwargs.get('count',1))
+        self.count = int(kwargs.get('count',20))
 
     
     def start_requests(self):
@@ -25,4 +25,4 @@ class StreetscrapeSpider(scrapy.Spider):
     def parse(self, response):
 
         logging.info("Response:")
-        logging.info(response.body)
+        logging.info(response.body_as_unicode())

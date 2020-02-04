@@ -7,8 +7,10 @@ import json
 
 from scrapy_autoproxy.proxy_objects import Proxy
 from scrapy_autoproxy.storage_manager import StorageManager
+import time
 
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+
+logger = logging.getLogger(__name__)
 
 class GatherproxySpider(scrapy.Spider):
     name = 'gatherproxy'
@@ -22,7 +24,7 @@ class GatherproxySpider(scrapy.Spider):
     def start_requests(self):
         for i in range(self.count):
             request = scrapy.Request(url='http://www.gatherproxy.com/proxylistbycountry', dont_filter=True)
-            logging.info("GET %s" % request.url)
+            logger.info("GET %s" % request.url)
             yield request
 
     def make_proxy(self,address,port,location,protocol='http'):
@@ -45,6 +47,7 @@ class GatherproxySpider(scrapy.Spider):
             self.make_proxy(proxy_data['PROXY_IP'], proxy_data['PROXY_PORT'], proxy_data['PROXY_COUNTRY'])
 
     def parse(self,response):
+        
         links = response.xpath('//ul[@class="pc-list"]/li/a/@href').extract()
 
         for link in links:
