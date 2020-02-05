@@ -280,4 +280,4 @@ if __name__ == "__main__":
             scheduler.allow_new_jobs = False
             tq.enqueue(Task(fn=do_sync))
         
-        time.sleep(2)
+        time.sleep(5)
