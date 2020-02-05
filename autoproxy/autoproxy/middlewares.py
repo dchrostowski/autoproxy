@@ -16,7 +16,6 @@ import sys
 import logging
 import twisted
 import time
-
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -68,6 +67,12 @@ class AutoproxySpiderMiddleware(object):
     def spider_opened(self, spider):
         spider.logger.info('Spider opened: %s' % spider.name)
 
+BAD_RESPONSE_CODES = [400,401,402,403]
+NEUTRAL_RESPONSE_CODES = [404]
+GOOD_RESPONSE_CODES = [200]
+
+
+
 
 class AutoproxyDownloaderMiddleware(object):
     # Not all methods need to be defined. If a method is not defined,
@@ -115,17 +120,52 @@ class AutoproxyDownloaderMiddleware(object):
         # - return a Response object
         # - return a Request object
         # - or raise IgnoreRequest
+
+
+        ## to do, use request.meta['download_latency']
         spider.logger.info("processing response for %s" % request.url)
-        proxy = request.meta['proxy_obj']
+        proxy = request.meta.get('proxy_obj',None)
 
+        
 
+        
+        if proxy:
 
-        if parse_domain(request.url) not in spider.allowed_domains and parse_domain(response.url) not in spider.allowed_domains:
-            logger.info("proxy redirected to a bad domain, marking bad")
-            proxy.callback(success=False)
-            return response
+            if parse_domain(request.url) not in spider.allowed_domains and parse_domain(response.url) not in spider.allowed_domains:
+                logger.info("proxy redirected to a bad domain, marking bad")
+                proxy.callback(success=False)
+                return response
 
-        proxy.callback(success=True)
+            
+            
+            if response.status in GOOD_RESPONSE_CODES:
+                logging.info("Got an explicitly good response code, marking good")
+                proxy.callback(success=True)
+            
+            elif response.status in NEUTRAL_RESPONSE_CODES:
+                logging.info("Got an explicitly neutral response, marking success=None")
+                proxy.callback(success=None)
+
+            elif response.status in BAD_RESPONSE_CODES:
+                logging.info("Got an explcitly bad response code, marking bad")
+                proxy.callback(success=False)
+
+            elif response.status >= 400:
+                logging.info("status code > 399, marking bad")
+                proxy.callback(success=False)
+            
+            elif response.status < 400:
+                logging.info("Got a status code < 400, marking good")
+                proxy.callback(success=True)
+            
+
+            else:
+                logging.info("edge case!!!!!!")
+                proxy.callback(success=None)
+
+            
+            
+        
         return response
 
     def process_exception(self, request, exception, spider):
@@ -143,15 +183,15 @@ class AutoproxyDownloaderMiddleware(object):
         if type(exception) == RedisDetailQueueEmpty:
             return None
 
-        
         proxy = request.meta.get('proxy_obj',None)
 
         if proxy is None:
             logger.warn("no proxy object found in request.meta")
 
         proxy.callback(success=False)
-        return None
         
+        return None
+
 
     def spider_opened(self, spider):
         spider.logger.info('Spider opened: %s' % spider.name)
