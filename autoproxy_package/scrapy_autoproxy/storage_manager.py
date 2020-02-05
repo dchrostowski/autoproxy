@@ -695,7 +695,7 @@ class StorageManager(object):
                 pass
             
         else:
-            logger.warn("proxy already exists.")
+            logger.warn("proxy with address %s and port %s already exists in the cache/db." % (address, port))
 
 
     def get_seed_queue(self):
