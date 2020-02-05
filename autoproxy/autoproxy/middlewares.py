@@ -178,7 +178,17 @@ class AutoproxyDownloaderMiddleware(object):
         # - return a Response object: stops process_exception() chain
         # - return a Request object: stops process_exception() chain
         spider.logger.info("processing exception for %s" % request.url)
-        logger.info(exception)
+        proxy = request.meta.get('proxy_obj',None)
+        
+        if proxy is not None:
+            if type(exception) is twisted.internet.error.Timeout:
+                logger.error("Request tmed out with proxy %s.  Trying a new proxy." % proxy.urlify())
+                proxy.callback(success=False)
+                new_proxy = self.proxy_mgr.get_proxy(request.url)
+                request.meta['proxy_obj'] = new_proxy
+                request.meta['proxy'] = new_proxy.urlify()
+                return request
+            
 
         if type(exception) == RedisDetailQueueEmpty:
             return None
