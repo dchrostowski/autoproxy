@@ -20,7 +20,7 @@ ACTIVE_PROXIES_PER_QUEUE = app_config('active_proxies_per_queue')
 INACTIVE_PROXIES_PER_QUEUE = app_config('inactive_proxies_per_queue')
 SEED_QUEUE_ID = app_config('seed_queue')
 PROXY_INTERVAL = app_config('proxy_interval')
-
+TARGET_ACTIVE_COUNT = 200
 import logging
 
 
@@ -76,14 +76,18 @@ class ProxyManager(object):
         elif flip_coin(SEED_FREQUENCY) and not is_seed:
             self.storage_mgr.create_new_details(queue=queue,count=1)
 
-        use_active = True
+        use_active = False
+
+        active_pct_chance = rdq_active.length() / TARGET_ACTIVE_COUNT
+
+        if flip_coin(active_pct_chance):
+            use_active = True
 
         if rdq_active.length() < MIN_QUEUE_SIZE:
             use_active=False
             
         
-        elif flip_coin(INACTIVE_PCT):
-            use_active = False
+    
 
         draw_queue = None
         
