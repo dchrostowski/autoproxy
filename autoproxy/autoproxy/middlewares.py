@@ -67,10 +67,6 @@ class AutoproxySpiderMiddleware(object):
     def spider_opened(self, spider):
         spider.logger.info('Spider opened: %s' % spider.name)
 
-BAD_RESPONSE_CODES = [400,401,402,403]
-NEUTRAL_RESPONSE_CODES = [404]
-GOOD_RESPONSE_CODES = [200]
-
 
 
 
@@ -79,16 +75,25 @@ class AutoproxyDownloaderMiddleware(object):
     # scrapy acts as if the downloader middleware does not modify the
     # passed objects.
 
-    def __init__(self,*args,**kwargs):
+    def __init__(self,crawler):
+        self.retry = crawler.settings.getbool('AUTOPROXY_RETRY',True)
+        self.retry_times = crawler.settings.getint('AUTOPROXY_RETRY_TIMES', 2)
+        default_neutral = crawler.settings.get('RETRY_HTTP_CODES',[]) + [404]
+        self.neutral_codes = crawler.settings.get('NEUTRAL_HTTP_CODES', default_neutral)
+        self.bad_codes = crawler.settings.get('BAD_HTTP_CODES',[400,401,402,403])
+        self.good_codes = crawler.settings.get('GOOD_HTTP_CODES', [200])
         
+
         self.proxy_mgr = ProxyManager()
-        logging.info(self.proxy_mgr.storage_mgr.redis_mgr)
-        self.exception_mgr = ExceptionManager()
+        
+        
+        
+        
 
     @classmethod
     def from_crawler(cls, crawler):
         # This method is used by Scrapy to create your spiders.
-        s = cls()
+        s = cls(crawler)
         crawler.signals.connect(s.spider_opened, signal=signals.spider_opened)
         return s
 
@@ -138,15 +143,15 @@ class AutoproxyDownloaderMiddleware(object):
 
             
             
-            if response.status in GOOD_RESPONSE_CODES:
+            if response.status in self.good_codes:
                 logging.info("Got an explicitly good response code, marking good")
                 proxy.callback(success=True)
             
-            elif response.status in NEUTRAL_RESPONSE_CODES:
+            elif response.status in self.neutral_codes:
                 logging.info("Got an explicitly neutral response, marking success=None")
                 proxy.callback(success=None)
 
-            elif response.status in BAD_RESPONSE_CODES:
+            elif response.status in self.bad_codes:
                 logging.info("Got an explcitly bad response code, marking bad")
                 proxy.callback(success=False)
 
@@ -160,7 +165,7 @@ class AutoproxyDownloaderMiddleware(object):
             
 
             else:
-                logging.info("edge case!!!!!!")
+                logging.warn("Got a weird edge case for an HTTP status code")
                 proxy.callback(success=None)
 
             
@@ -182,18 +187,25 @@ class AutoproxyDownloaderMiddleware(object):
         
         if proxy is not None:
             if type(exception) is twisted.internet.error.TimeoutError:
-                logger.error("Request tmed out with proxy %s.  Trying a new proxy." % proxy.urlify())
                 proxy.callback(success=False)
-                new_proxy = self.proxy_mgr.get_proxy(request.url)
-                request.meta['proxy_obj'] = new_proxy
-                request.meta['proxy'] = new_proxy.urlify()
-                return request
+                logger.error("Request tmed out with proxy %s." % proxy.urlify())
+                if self.retry:
+                    retried = request.meta.get('autoproxy_tries',0) + 1
+                    
+                    if retried > self.retry_times:
+                        logging.error("url %s has exceeded max autoproxy retry attempts.  giving up..." % request.url)
+                        return None
+                    else:
+                        new_proxy = self.proxy_mgr.get_proxy(request.url)
+                        request.meta['proxy_obj'] = new_proxy
+                        request.meta['proxy'] = new_proxy.urlify()
+                        request.meta['autoproxy_tries'] = retried
+                        logging.error("Retrying request with a new proxy.")
+                        return request
             
 
         if type(exception) == RedisDetailQueueEmpty:
             return None
-
-        proxy = request.meta.get('proxy_obj',None)
 
         if proxy is None:
             logger.warn("no proxy object found in request.meta")

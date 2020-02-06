@@ -32,7 +32,7 @@ services:
 #   Set a volume some that database is not lost after shutting down the container.
 #   I used the name postgres-data but you can changed it to something else.
     volumes:
-      - ./data/database:/var/lib/postgresql/data
+      - autoproxy_pgdata:/var/lib/postgresql/data
       - ./data/init_sql:/docker-entrypoint-initdb.d
   spider_scheduler:
     build:
@@ -41,3 +41,5 @@ services:
     depends_on:
       - scrapyd
     container_name: autoproxy_scheduler
+volumes:
+  autoproxy_pgdata:
