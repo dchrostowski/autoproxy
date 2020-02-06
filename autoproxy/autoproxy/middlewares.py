@@ -181,7 +181,7 @@ class AutoproxyDownloaderMiddleware(object):
         proxy = request.meta.get('proxy_obj',None)
         
         if proxy is not None:
-            if type(exception) is twisted.internet.error.Timeout:
+            if type(exception) is twisted.internet.error.TimeoutError:
                 logger.error("Request tmed out with proxy %s.  Trying a new proxy." % proxy.urlify())
                 proxy.callback(success=False)
                 new_proxy = self.proxy_mgr.get_proxy(request.url)
