@@ -609,7 +609,7 @@ class RedisManager(object):
         else:
             redis_data = detail.to_dict(redis_format=True)
             self.redis.hmset(detail_key,redis_data)
-            if not bypass_db_check:
+            if not detail.proxy_id:
                 self.redis.sadd(NEW_DETAILS_SET_KEY,detail_key)
         
         rdq = RedisDetailQueue(self.get_queue_by_key(detail.queue_key),active=detail.active)
@@ -714,10 +714,10 @@ class StorageManager(object):
                 raise Exception("Error while trying to create a new detail: proxy key does not exist in redis cache for proxy id %s" % proxy_id)
             
             if self.redis_mgr.redis.exists('d_%s_%s' % (queue.queue_key,proxy_key)):
-
                 continue
             detail_kwargs = {'proxy_id': proxy_id, 'proxy_key': proxy_key, 'queue_id': queue.id(), 'queue_key': queue.queue_key}
             new_detail = Detail(**detail_kwargs)
+            self.redis_mgr.sadd(NEW_DETAILS_SET_KEY,new_detail)
             self.redis_mgr.register_detail(new_detail,bypass_db_check=True)
 
     
@@ -746,7 +746,7 @@ class StorageManager(object):
                 proxy_id = cursor.fetchone()[0]
                 proxy_keys_to_id[p.proxy_key] = proxy_id
             except psycopg2.errors.UniqueViolation as e:
-
+                logging.warn("attempted to insert a pre-existing proxy")
                 # existing_proxy = self.db_mgr.get_proxy_by_address_and_port(p.address,p.port)
                 proxy_keys_to_id[p.proxy_key] = None
 
@@ -755,7 +755,9 @@ class StorageManager(object):
             if d.proxy_id is None:
                 new_proxy_id = proxy_keys_to_id[d.proxy_key]
                 if new_proxy_id is None:
-
+                    logging.warn("Dropping new detail as it may exist")
+                    proxy_in_question = Proxy(**self.redis_mgr.hgetall(detail.proxy_key))
+                    logging.warn("check proxy: %s" % proxy.urlify())
                     continue
                 else:
                     d.proxy_id = new_proxy_id
