@@ -29,7 +29,7 @@ sys.path.append("%s/autoproxy/autoproxy_middleware" % CWD)
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = False
 RETRY_ENABLED = False
-DOWNLOAD_TIMEOUT =120
+DOWNLOAD_TIMEOUT =30
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
 CONCURRENT_REQUESTS = 64
 

@@ -22,7 +22,7 @@ Scrapy==1.8.0
 scrapy-user-agents==0.1.1
 service-identity==18.1.0
 six==1.14.0
-Twisted==19.10.0
+Twisted==20.3.0
 ua-parser==0.8.0
 user-agents==2.0
 w3lib==1.21.0
