@@ -4,6 +4,7 @@ import scrapy
 import logging
 import sys
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+from scrapy.utils.project import get_project_settings
 
 
 class StreetscrapeSpider(scrapy.Spider):
@@ -12,14 +13,8 @@ class StreetscrapeSpider(scrapy.Spider):
     start_urls = ['https://api.dev.proxycrawler.com/proxy/test']
 
     def __init__(self,*args,**kwargs):
-        self.count = int(kwargs.get('count',20))
-
-    
-    def start_requests(self):
-        for i in range(self.count):
-            request = scrapy.Request(url='https://api.dev.proxycrawler.com/proxy/test', dont_filter=True)
-            logging.info("GET %s" % request.url)
-            yield request
+        logging.info("%s started." % self.name)
+        
     
 
     def parse(self, response):
